@@ -14,7 +14,7 @@ This project provides a complete WiFi scanner application for the JC8012P4A1C 10
 - ✅ **Self-Contained**: All components included locally, no external dependencies
 - ✅ **Thread-Safe**: Proper LVGL locking and task synchronization
 
-## 🎯 **Current Status: FULLY WORKING**
+## 🎯 **Current Status: In progress Do not use**
 
 ### ✅ **Working Features**
 - **Physical Display**: 1280x800 MIPI-DSI display with proper backlight control
