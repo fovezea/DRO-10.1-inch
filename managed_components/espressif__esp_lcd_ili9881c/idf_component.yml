@@ -1,0 +1,11 @@
+dependencies:
+  idf: '>=5.3'
+description: ESP LCD ILI9881C (MIPI DSI)
+repository: git://github.com/espressif/esp-bsp.git
+repository_info:
+  commit_sha: 7075b9534f987db24e20044776fb2efed5c1fe0c
+  path: components/lcd/esp_lcd_ili9881c
+targets:
+- esp32p4
+url: https://github.com/espressif/esp-bsp/tree/master/components/lcd/esp_lcd_ili9881c
+version: 1.0.1

@@ -14,3 +14,6 @@ size_info_*.txt
 
 # idf-component-manager output
 dependencies.lock
+**/squareline/backup/**
+**/squareline/autosave/**
+/build

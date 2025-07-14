@@ -1,0 +1,376 @@
+/*
+ * SPDX-FileCopyrightText: 2025 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+#include "nvs_flash.h"
+#include "nvs.h"
+#include "esp_log.h"
+#include "esp_err.h"
+#include "esp_check.h"
+#include "esp_memory_utils.h"
+#include "esp_wifi.h"
+#include "esp_event.h"
+#include "esp_netif.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/event_groups.h"
+#include <string.h>
+// LVGL with esp_lvgl_port and BSP
+#include "lvgl.h"
+#include "esp_lvgl_port.h"
+#include "esp_lvgl_port_disp.h"
+#include "driver/gpio.h"
+#include "eez_ui.h"
+#include "ui.h"  // Include EEZ Studio generated UI
+
+// Include BSP for ESP32-P4 board
+#include "bsp/esp32_p4_function_ev_board.h"
+
+// Display configuration - restore to working resolution
+#define LCD_H_RES              1280
+#define LCD_V_RES              800
+
+// Forward declarations for callbacks
+static void wifi_scan_callback(void);
+static void network_selected_callback(const char *ssid);
+
+// Forward declaration for WiFi initialization  
+static void wifi_init(void);
+
+// Forward declaration for UI tick task
+static void ui_tick_task(void *pvParameters);
+
+static const char *TAG = "WIFI_DEBUG";
+
+/* WiFi scan result storage */
+#define MAX_AP_COUNT 20
+static wifi_ap_record_t ap_info[MAX_AP_COUNT];
+static uint16_t ap_count = 0;
+
+/* Event group for WiFi events */
+static EventGroupHandle_t wifi_event_group;
+#define WIFI_CONNECTED_BIT BIT0
+#define WIFI_FAIL_BIT      BIT1
+
+/* Display handles */
+static lv_display_t *lvgl_disp = NULL;
+
+
+/**
+ * @brief WiFi event handler with detailed logging
+ */
+static void wifi_event_handler(void* arg, esp_event_base_t event_base,
+                              int32_t event_id, void* event_data)
+{
+    if (event_base == WIFI_EVENT) {
+        switch (event_id) {
+            case WIFI_EVENT_STA_START:
+                break;
+            case WIFI_EVENT_STA_STOP:
+                break;
+            case WIFI_EVENT_STA_CONNECTED:
+                break;
+            case WIFI_EVENT_STA_DISCONNECTED:
+                break;
+            case WIFI_EVENT_SCAN_DONE:
+                // NOTE: UI update is handled by scan task instead of event handler
+                break;
+            default:
+                break;
+        }
+    } else if (event_base == IP_EVENT) {
+        switch (event_id) {
+            case IP_EVENT_STA_GOT_IP:
+                break;
+            case IP_EVENT_STA_LOST_IP:
+                break;
+            default:
+                break;
+        }
+    }
+}
+
+/**
+ * @brief Initialize WiFi with detailed logging
+ */
+static void wifi_init(void)
+{
+    // Create event group
+    wifi_event_group = xEventGroupCreate();
+    
+    // Initialize network interface
+    esp_err_t ret = esp_netif_init();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "esp_netif_init failed: %s", esp_err_to_name(ret));
+        return;
+    }
+    
+    // Create default event loop
+    ret = esp_event_loop_create_default();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "esp_event_loop_create_default failed: %s", esp_err_to_name(ret));
+        return;
+    }
+    
+    // Create default WiFi station
+    esp_netif_t *netif = esp_netif_create_default_wifi_sta();
+    if (netif == NULL) {
+        ESP_LOGE(TAG, "Failed to create default WiFi station");
+        return;
+    }
+    
+    // Initialize WiFi
+    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+    ret = esp_wifi_init(&cfg);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "esp_wifi_init failed: %s", esp_err_to_name(ret));
+        return;
+    }
+    
+    // Register event handler
+    ret = esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "esp_event_handler_register (WIFI_EVENT) failed: %s", esp_err_to_name(ret));
+        return;
+    }
+    
+    ret = esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "esp_event_handler_register (IP_EVENT) failed: %s", esp_err_to_name(ret));
+        return;
+    }
+    
+    // Set WiFi mode
+    ret = esp_wifi_set_mode(WIFI_MODE_STA);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "esp_wifi_set_mode failed: %s", esp_err_to_name(ret));
+        return;
+    }
+    
+    // Start WiFi
+    ret = esp_wifi_start();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "esp_wifi_start failed: %s", esp_err_to_name(ret));
+        return;
+    }
+}
+
+/**
+ * @brief Print WiFi scan results to console
+ */
+static void print_wifi_scan_results(void)
+{
+    // Just update the UI, no console output needed
+    // The scan results are displayed on the screen via EEZ UI
+}
+
+/**
+ * @brief Perform WiFi scan with detailed logging
+ */
+static void wifi_scan_task(void *pvParameters)
+{
+    vTaskDelay(pdMS_TO_TICKS(2000)); // Wait for WiFi to be ready
+    
+    // Configure scan
+    wifi_scan_config_t scan_config = {
+        .ssid = NULL,
+        .bssid = NULL,
+        .channel = 0,
+        .show_hidden = true,
+        .scan_type = WIFI_SCAN_TYPE_ACTIVE,
+        .scan_time = {
+            .active = {
+                .min = 120,
+                .max = 150
+            }
+        }
+    };
+    
+    esp_err_t err = esp_wifi_scan_start(&scan_config, true);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "WiFi scan start failed: %s", esp_err_to_name(err));
+        vTaskDelete(NULL);
+        return;
+    }
+    
+    // Get scan results
+    ap_count = MAX_AP_COUNT;
+    err = esp_wifi_scan_get_ap_records(&ap_count, ap_info);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to get scan results: %s", esp_err_to_name(err));
+        ap_count = 0;
+    }
+    
+    // Print results
+    print_wifi_scan_results();
+    
+    // Update UI with scan results using EEZ component
+    eez_ui_update_wifi_list(ap_info, ap_count);
+    
+    vTaskDelete(NULL);
+}
+
+/**
+ * @brief Task to create UI elements after LVGL is ready
+ */
+static void ui_creation_task(void *pvParameters)
+{
+    // Wait for LVGL to be fully initialized
+    vTaskDelay(pdMS_TO_TICKS(1000));
+    
+    // Lock LVGL for thread safety
+    lvgl_port_lock(0);
+    
+    // Initialize EEZ Studio generated UI
+    ui_init();
+    
+    // Ensure display rotation is still correct after UI creation
+    lv_display_set_rotation(lvgl_disp, LV_DISPLAY_ROTATION_90);
+    ESP_LOGI(TAG, "Display rotation re-confirmed as 90 degrees (landscape) after UI creation");
+    
+    // Unlock LVGL after all UI creation is complete
+    lvgl_port_unlock();
+    
+    vTaskDelete(NULL);
+}
+
+/**
+ * @brief Task to handle EEZ Studio UI tick
+ */
+static void ui_tick_task(void *pvParameters)
+{
+    // Wait for UI creation to complete
+    vTaskDelay(pdMS_TO_TICKS(2000));
+    
+    while (1) {
+        // Lock LVGL for thread safety
+        lvgl_port_lock(0);
+        
+        // Call EEZ Studio UI tick function
+        ui_tick();
+        
+        // Unlock LVGL
+        lvgl_port_unlock();
+        
+        // Tick every 10ms (100Hz)
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+}
+
+/**
+ * @brief Monitor task to print system information
+ */
+static void system_monitor_task(void *pvParameters)
+{
+    while (1) {
+        ESP_LOGI(TAG, "=== System Monitor ===");
+        ESP_LOGI(TAG, "Free heap: %lu bytes", esp_get_free_heap_size());
+        ESP_LOGI(TAG, "Min free heap: %lu bytes", esp_get_minimum_free_heap_size());
+        ESP_LOGI(TAG, "Free internal heap: %lu bytes", esp_get_free_internal_heap_size());
+        ESP_LOGI(TAG, "Task count: %d", uxTaskGetNumberOfTasks());
+        
+        // Check if display rotation has changed
+        if (lvgl_disp != NULL) {
+            lv_display_rotation_t current_rotation = lv_display_get_rotation(lvgl_disp);
+            if (current_rotation != LV_DISPLAY_ROTATION_90) {
+                ESP_LOGW(TAG, "Display rotation changed from 90 to %d! Correcting...", current_rotation);
+                lv_display_set_rotation(lvgl_disp, LV_DISPLAY_ROTATION_90);
+                ESP_LOGI(TAG, "Display rotation corrected back to 90 degrees (landscape)");
+            }
+        }
+        
+        vTaskDelay(pdMS_TO_TICKS(10000)); // Print every 10 seconds
+    }
+}
+
+/**
+ * @brief Initialize physical display using BSP
+ */
+static esp_err_t app_display_init(void)
+{
+    // Initialize BSP display - this handles LVGL port init and display creation
+    lv_display_t *lv_disp = bsp_display_start();
+    if (lv_disp != NULL) {
+        lvgl_disp = lv_disp;
+        
+        // Turn on the display backlight
+        esp_err_t backlight_ret = bsp_display_backlight_on();
+        if (backlight_ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to turn on display backlight: %s", esp_err_to_name(backlight_ret));
+        }
+        
+        // Set display orientation to landscape (90 degrees)
+        lv_display_set_rotation(lv_disp, LV_DISPLAY_ROTATION_90);
+        ESP_LOGI(TAG, "Display rotation set to 90 degrees (landscape) in app_display_init");
+        
+        return ESP_OK;
+    } else {
+        ESP_LOGE(TAG, "BSP display initialization failed");
+        return ESP_FAIL;
+    }
+}
+
+/**
+ * @brief Initialize LVGL - BSP already created the display
+ */
+static esp_err_t app_lvgl_init(void)
+{
+    if (lvgl_disp == NULL) {
+        ESP_LOGE(TAG, "No LVGL display available from BSP");
+        return ESP_FAIL;
+    }
+    
+    return ESP_OK;
+}
+
+void app_main(void)
+{
+    /* Initialize NVS */
+    esp_err_t ret = nvs_flash_init();
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        ret = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK(ret);
+    
+    /* Initialize Display */
+    ESP_ERROR_CHECK(app_display_init());
+    
+    /* Initialize LVGL */
+    ESP_ERROR_CHECK(app_lvgl_init());
+    
+    /* Initialize WiFi */
+    wifi_init();
+    
+    /* Create tasks */
+    // Create UI creation task (higher priority to run first)
+    xTaskCreate(ui_creation_task, "ui_creation", 4096, NULL, 5, NULL);
+    
+    // Create UI tick task for EEZ Studio (lower priority to run after UI creation)
+    xTaskCreate(ui_tick_task, "ui_tick", 4096, NULL, 3, NULL);
+    
+    // Create system monitor task
+    xTaskCreate(system_monitor_task, "system_monitor", 4096, NULL, 1, NULL);
+    
+    // Create WiFi scan task
+    xTaskCreate(wifi_scan_task, "wifi_scan", 4096, NULL, 2, NULL);
+}
+
+/**
+ * @brief WiFi scan callback for EEZ UI
+ */
+static void wifi_scan_callback(void)
+{
+    eez_ui_set_status("Scanning...");
+    esp_wifi_scan_start(NULL, false);
+}
+
+/**
+ * @brief Network selection callback for EEZ UI
+ */
+static void network_selected_callback(const char *ssid)
+{
+    // TODO: Implement network connection logic
+    eez_ui_set_status("Selected network - connection not implemented yet");
+}
