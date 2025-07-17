@@ -2,10 +2,10 @@
 
 [中文版本](./README_CN.md)
 
-This project provides a complete Digital Readout (DRO) system for milling machines using the JC8012P4A1C 10.1-inch ESP32-P4 board with LVGL 9.2 and EEZ Studio integration. It features a modern touch interface for displaying and controlling machine axis positions.
+This project provides a complete Digital Readout (DRO) system for milling machines using the JC8012P4A1C 10.1-inch ESP32-P4 board with LVGL 9.2 and EEZ Studio integration. It features a modern touch interface for displaying and controlling machine axis positions as a front end communicationg by espnow with ESP32 backend that read the liniar of rotary scales.
 
 **Key Features:**
-- ✅ **Multi-Axis DRO**: Support for X, Y, Z, W, and C axes
+ - ✅ **Multi-Axis DRO**: Support for virtual axes and combination between axes. Name and interaction of the axes are configurable 
 - ✅ **LVGL 9.2**: Fully configured and optimized for 1280x800 display
 - ✅ **EEZ Studio Integration**: Ready for visual UI design and development
 - ✅ **Modern UI**: Professional DRO interface with touch controls
@@ -14,7 +14,7 @@ This project provides a complete Digital Readout (DRO) system for milling machin
 - ✅ **Self-Contained**: All components included locally, no external dependencies
 - ✅ **Thread-Safe**: Proper LVGL locking and task synchronization
 
-## 🎯 **Current Status: Working DRO System**
+## 🎯 **Current Status: Work in progress DRO System do not use it**
 
 ### ✅ **Working Features**
 - **Physical Display**: 1280x800 MIPI-DSI display with proper backlight control
@@ -26,6 +26,10 @@ This project provides a complete Digital Readout (DRO) system for milling machin
 - **Memory Stability**: Stable memory usage, no crashes or watchdog timeouts
 - **Tab Navigation**: Working tab interface for different DRO functions
 - **Axis Controls**: Set zero, set value, and global zero functions
+
+### ✅ **Not Working Features**
+- **ESPNOW**: WiFi configuration working but espnow not
+- **Display variable and buttons**: Only layout is done. No callbacks will be done untill the UI is finalised since the EEZ will overide them all 
 
 ### 🔧 **Hardware Configuration**
 - **Main Board**: ESP32-P4 (JC8012P4A1C 10.1-inch board)
