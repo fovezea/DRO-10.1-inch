@@ -226,8 +226,8 @@ static void ui_creation_task(void *pvParameters)
     ui_init();
     
     // Ensure display rotation is still correct after UI creation
-    lv_display_set_rotation(lvgl_disp, LV_DISPLAY_ROTATION_90);
-    ESP_LOGI(TAG, "Display rotation re-confirmed as 90 degrees (landscape) after UI creation");
+    lv_display_set_rotation(lvgl_disp, LV_DISPLAY_ROTATION_270);
+    ESP_LOGI(TAG, "Display rotation re-confirmed as 270 degrees (landscape) after UI creation");
     
     // Unlock LVGL after all UI creation is complete
     lvgl_port_unlock();
@@ -273,10 +273,10 @@ static void system_monitor_task(void *pvParameters)
         // Check if display rotation has changed
         if (lvgl_disp != NULL) {
             lv_display_rotation_t current_rotation = lv_display_get_rotation(lvgl_disp);
-            if (current_rotation != LV_DISPLAY_ROTATION_90) {
-                ESP_LOGW(TAG, "Display rotation changed from 90 to %d! Correcting...", current_rotation);
-                lv_display_set_rotation(lvgl_disp, LV_DISPLAY_ROTATION_90);
-                ESP_LOGI(TAG, "Display rotation corrected back to 90 degrees (landscape)");
+            if (current_rotation != LV_DISPLAY_ROTATION_270) {
+                ESP_LOGW(TAG, "Display rotation changed from 270 to %d! Correcting...", current_rotation);
+                lv_display_set_rotation(lvgl_disp, LV_DISPLAY_ROTATION_270);
+                ESP_LOGI(TAG, "Display rotation corrected back to 270 degrees (landscape)");
             }
         }
         
@@ -300,9 +300,9 @@ static esp_err_t app_display_init(void)
             ESP_LOGE(TAG, "Failed to turn on display backlight: %s", esp_err_to_name(backlight_ret));
         }
         
-        // Set display orientation to landscape (90 degrees)
-        lv_display_set_rotation(lv_disp, LV_DISPLAY_ROTATION_90);
-        ESP_LOGI(TAG, "Display rotation set to 90 degrees (landscape) in app_display_init");
+        // Set display orientation to landscape (270 degrees)
+        lv_display_set_rotation(lv_disp, LV_DISPLAY_ROTATION_270);
+        ESP_LOGI(TAG, "Display rotation set to 270 degrees (landscape) in app_display_init");
         
         return ESP_OK;
     } else {

@@ -7,6 +7,8 @@
 extern "C" {
 #endif
 
+extern void action_change_to_setting_page(lv_event_t * e);
+extern void action_settings_mm_switch_pressed(lv_event_t * e);
 
 
 #ifdef __cplusplus

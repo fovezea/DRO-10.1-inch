@@ -1,9 +1,8 @@
 #ifndef EEZ_LVGL_UI_GUI_H
 #define EEZ_LVGL_UI_GUI_H
 
-// NOTE: This is an auto-generated file. This include path was modified from <lvgl/lvgl.h> to "lvgl.h" to fix a build error.
-// This change may be overwritten when re-generating code from EEZ Studio.
-#include "lvgl.h"
+#include <lvgl.h>
+
 
 
 #if defined(EEZ_FOR_LVGL)

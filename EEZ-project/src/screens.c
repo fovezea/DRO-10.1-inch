@@ -1,5 +1,4 @@
 #include <string.h>
-#include <stdlib.h>
 
 #include "screens.h"
 #include "images.h"
@@ -8,6 +7,8 @@
 #include "vars.h"
 #include "styles.h"
 #include "ui.h"
+
+#include <string.h>
 
 objects_t objects;
 lv_obj_t *tick_value_change_obj;
@@ -19,7 +20,7 @@ static void event_handler_cb_main_obj1(lv_event_t *e) {
         lv_obj_t *ta = lv_event_get_target(e);
         if (tick_value_change_obj != ta) {
             const char *value = lv_textarea_get_text(ta);
-            set_var_active_space_number(atoi(value));
+            set_var_active_space_number(value);
         }
     }
 }
@@ -30,7 +31,7 @@ static void event_handler_cb_main_active_tool_number(lv_event_t *e) {
         lv_obj_t *ta = lv_event_get_target(e);
         if (tick_value_change_obj != ta) {
             const char *value = lv_textarea_get_text(ta);
-            set_var_active_tool_number(atoi(value));
+            set_var_active_tool_number(value);
         }
     }
 }
@@ -41,7 +42,7 @@ static void event_handler_cb_main_axis4_textarea(lv_event_t *e) {
         lv_obj_t *ta = lv_event_get_target(e);
         if (tick_value_change_obj != ta) {
             const char *value = lv_textarea_get_text(ta);
-            set_var_virtual_axis_4(atof(value));
+            set_var_virtual_axis_4(value);
         }
     }
 }
@@ -52,7 +53,7 @@ static void event_handler_cb_main_axis1_textarea(lv_event_t *e) {
         lv_obj_t *ta = lv_event_get_target(e);
         if (tick_value_change_obj != ta) {
             const char *value = lv_textarea_get_text(ta);
-            set_var_virtual_axis_1(atof(value));
+            set_var_virtual_axis_1(value);
         }
     }
 }
@@ -63,7 +64,7 @@ static void event_handler_cb_main_axis3_textarea(lv_event_t *e) {
         lv_obj_t *ta = lv_event_get_target(e);
         if (tick_value_change_obj != ta) {
             const char *value = lv_textarea_get_text(ta);
-            set_var_virtual_axis_3(atof(value));
+            set_var_virtual_axis_3(value);
         }
     }
 }
@@ -74,7 +75,7 @@ static void event_handler_cb_main_axis5_textarea(lv_event_t *e) {
         lv_obj_t *ta = lv_event_get_target(e);
         if (tick_value_change_obj != ta) {
             const char *value = lv_textarea_get_text(ta);
-            set_var_virtual_axis_5(atof(value));
+            set_var_virtual_axis_5(value);
         }
     }
 }
@@ -85,23 +86,10 @@ static void event_handler_cb_main_axis2_textarea(lv_event_t *e) {
         lv_obj_t *ta = lv_event_get_target(e);
         if (tick_value_change_obj != ta) {
             const char *value = lv_textarea_get_text(ta);
-            set_var_virtual_axis_2(atof(value));
+            set_var_virtual_axis_2(value);
         }
     }
 }
-
-static void tab_button_event_handler(lv_event_t *e) {
-    lv_event_code_t event = lv_event_get_code(e);
-    if (event == LV_EVENT_CLICKED) {
-        lv_obj_t *button = lv_event_get_target(e);
-        uint32_t tab_index = (uint32_t)lv_event_get_user_data(e);
-        
-        // Manually switch to the selected tab
-        lv_tabview_set_active(objects.obj0, tab_index, LV_ANIM_ON);
-    }
-}
-
-
 
 void create_screen_main() {
     lv_obj_t *obj = lv_obj_create(0);
@@ -118,15 +106,6 @@ void create_screen_main() {
             lv_tabview_set_tab_bar_position(obj, LV_DIR_TOP);
             lv_tabview_set_tab_bar_size(obj, 60);
             lv_obj_set_style_text_color(obj, lv_color_hex(0xfff9f600), LV_PART_MAIN | LV_STATE_DEFAULT);
-            // Enable clickable tabs and ensure proper touch handling
-            lv_obj_add_flag(obj, LV_OBJ_FLAG_CLICKABLE);
-            lv_obj_add_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
-                        lv_obj_set_style_bg_opa(obj, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
-            
-            // Ensure tabview is properly configured for touch input
-            lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, LV_PART_SCROLLBAR | LV_STATE_DEFAULT);
-            lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, LV_PART_SCROLLBAR | LV_STATE_SCROLLED);
-            
             {
                 lv_obj_t *parent_obj = obj;
                 {
@@ -135,13 +114,6 @@ void create_screen_main() {
                     objects.dro_tab = obj;
                     add_style_tab_style(obj);
                     lv_obj_set_style_text_color(obj, lv_color_hex(0xfff9f600), LV_PART_MAIN | LV_STATE_DEFAULT);
-                    
-                    // Get the tab button and add explicit event handler
-                    lv_obj_t *tab_bar = lv_tabview_get_tab_bar(objects.obj0);
-                    lv_obj_t *tab_button = lv_obj_get_child_by_type(tab_bar, 0, &lv_button_class);
-                    if (tab_button) {
-                        lv_obj_add_event_cb(tab_button, tab_button_event_handler, LV_EVENT_CLICKED, (void*)0);
-                    }
                     {
                         lv_obj_t *parent_obj = obj;
                         {
@@ -445,7 +417,6 @@ void create_screen_main() {
                             lv_obj_set_pos(obj, 638, 638);
                             lv_obj_set_size(obj, 100, 50);
                             add_style_button_tyle1(obj);
-
                             {
                                 lv_obj_t *parent_obj = obj;
                                 {
@@ -678,52 +649,10 @@ void create_screen_main() {
                     }
                 }
                 {
-                    // Tab 2
-                    lv_obj_t *obj = lv_tabview_add_tab(parent_obj, "Tab 2");
-                    add_style_tab_style(obj);
-                    lv_obj_set_style_text_color(obj, lv_color_hex(0xfff9f600), LV_PART_MAIN | LV_STATE_DEFAULT);
-                    
-                    // Get the tab button and add explicit event handler
-                    lv_obj_t *tab_bar = lv_tabview_get_tab_bar(objects.obj0);
-                    lv_obj_t *tab_button = lv_obj_get_child_by_type(tab_bar, 1, &lv_button_class);
-                    if (tab_button) {
-                        lv_obj_add_event_cb(tab_button, tab_button_event_handler, LV_EVENT_CLICKED, (void*)1);
-                    }
-                    
-                    {
-                        lv_obj_t *parent_obj = obj;
-                        {
-                            // Add a label to make the tab visible
-                            lv_obj_t *obj = lv_label_create(parent_obj);
-                            lv_obj_set_pos(obj, 50, 50);
-                            lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-                            lv_label_set_text(obj, "Tab 2 Content");
-                        }
-                    }
+                    lv_obj_t *obj = lv_tabview_add_tab(parent_obj, "Tab");
                 }
                 {
-                    // Tab 3
-                    lv_obj_t *obj = lv_tabview_add_tab(parent_obj, "Tab 3");
-                    add_style_tab_style(obj);
-                    lv_obj_set_style_text_color(obj, lv_color_hex(0xfff9f600), LV_PART_MAIN | LV_STATE_DEFAULT);
-                    
-                    // Get the tab button and add explicit event handler
-                    lv_obj_t *tab_bar = lv_tabview_get_tab_bar(objects.obj0);
-                    lv_obj_t *tab_button = lv_obj_get_child_by_type(tab_bar, 2, &lv_button_class);
-                    if (tab_button) {
-                        lv_obj_add_event_cb(tab_button, tab_button_event_handler, LV_EVENT_CLICKED, (void*)2);
-                    }
-                    
-                    {
-                        lv_obj_t *parent_obj = obj;
-                        {
-                            // Add a label to make the tab visible
-                            lv_obj_t *obj = lv_label_create(parent_obj);
-                            lv_obj_set_pos(obj, 50, 50);
-                            lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-                            lv_label_set_text(obj, "Tab 3 Content");
-                        }
-                    }
+                    lv_obj_t *obj = lv_tabview_add_tab(parent_obj, "Tab");
                 }
             }
         }
@@ -734,79 +663,72 @@ void create_screen_main() {
 
 void tick_screen_main() {
     {
-        char new_val_str[32];
-        snprintf(new_val_str, sizeof(new_val_str), "%ld", get_var_active_space_number());
+        const char *new_val = get_var_active_space_number();
         const char *cur_val = lv_textarea_get_text(objects.obj1);
         uint32_t max_length = lv_textarea_get_max_length(objects.obj1);
-        if (strncmp(new_val_str, cur_val, max_length) != 0) {
+        if (strncmp(new_val, cur_val, max_length) != 0) {
             tick_value_change_obj = objects.obj1;
-            lv_textarea_set_text(objects.obj1, new_val_str);
+            lv_textarea_set_text(objects.obj1, new_val);
             tick_value_change_obj = NULL;
         }
     }
     {
-        char new_val_str[32];
-        snprintf(new_val_str, sizeof(new_val_str), "%ld", get_var_active_tool_number());
+        const char *new_val = get_var_active_tool_number();
         const char *cur_val = lv_textarea_get_text(objects.active_tool_number);
         uint32_t max_length = lv_textarea_get_max_length(objects.active_tool_number);
-        if (strncmp(new_val_str, cur_val, max_length) != 0) {
+        if (strncmp(new_val, cur_val, max_length) != 0) {
             tick_value_change_obj = objects.active_tool_number;
-            lv_textarea_set_text(objects.active_tool_number, new_val_str);
+            lv_textarea_set_text(objects.active_tool_number, new_val);
             tick_value_change_obj = NULL;
         }
     }
     {
-        char new_val_str[32];
-        snprintf(new_val_str, sizeof(new_val_str), "%.4f", get_var_virtual_axis_4());
+        const char *new_val = get_var_virtual_axis_4();
         const char *cur_val = lv_textarea_get_text(objects.axis4_textarea);
         uint32_t max_length = lv_textarea_get_max_length(objects.axis4_textarea);
-        if (strncmp(new_val_str, cur_val, max_length) != 0) {
+        if (strncmp(new_val, cur_val, max_length) != 0) {
             tick_value_change_obj = objects.axis4_textarea;
-            lv_textarea_set_text(objects.axis4_textarea, new_val_str);
+            lv_textarea_set_text(objects.axis4_textarea, new_val);
             tick_value_change_obj = NULL;
         }
     }
     {
-        char new_val_str[32];
-        snprintf(new_val_str, sizeof(new_val_str), "%.4f", get_var_virtual_axis_1());
+        const char *new_val = get_var_virtual_axis_1();
         const char *cur_val = lv_textarea_get_text(objects.axis1_textarea);
         uint32_t max_length = lv_textarea_get_max_length(objects.axis1_textarea);
-        if (strncmp(new_val_str, cur_val, max_length) != 0) {
+        if (strncmp(new_val, cur_val, max_length) != 0) {
             tick_value_change_obj = objects.axis1_textarea;
-            lv_textarea_set_text(objects.axis1_textarea, new_val_str);
+            lv_textarea_set_text(objects.axis1_textarea, new_val);
             tick_value_change_obj = NULL;
         }
     }
     {
-        char new_val_str[32];
-        snprintf(new_val_str, sizeof(new_val_str), "%.4f", get_var_virtual_axis_3());
+        const char *new_val = get_var_virtual_axis_3();
         const char *cur_val = lv_textarea_get_text(objects.axis3_textarea);
         uint32_t max_length = lv_textarea_get_max_length(objects.axis3_textarea);
-        if (strncmp(new_val_str, cur_val, max_length) != 0) {
+        if (strncmp(new_val, cur_val, max_length) != 0) {
             tick_value_change_obj = objects.axis3_textarea;
-            lv_textarea_set_text(objects.axis3_textarea, new_val_str);
+            lv_textarea_set_text(objects.axis3_textarea, new_val);
             tick_value_change_obj = NULL;
         }
     }
     {
-        char new_val_str[32];
-        snprintf(new_val_str, sizeof(new_val_str), "%.4f", get_var_virtual_axis_5());
+        const char *new_val = get_var_virtual_axis_5();
         const char *cur_val = lv_textarea_get_text(objects.axis5_textarea);
         uint32_t max_length = lv_textarea_get_max_length(objects.axis5_textarea);
-        if (strncmp(new_val_str, cur_val, max_length) != 0) {
+        if (strncmp(new_val, cur_val, max_length) != 0) {
             tick_value_change_obj = objects.axis5_textarea;
-            lv_textarea_set_text(objects.axis5_textarea, new_val_str);
+            lv_textarea_set_text(objects.axis5_textarea, new_val);
             tick_value_change_obj = NULL;
         }
     }
     {
-        char new_val_str[32];
-        snprintf(new_val_str, sizeof(new_val_str), "%.4f", get_var_virtual_axis_2());
+        const char *new_val = get_var_virtual_axis_2();
         const char *cur_val = lv_textarea_get_text(objects.axis2_textarea);
         uint32_t max_length = lv_textarea_get_max_length(objects.axis2_textarea);
-        if (strncmp(new_val_str, cur_val, max_length) != 0) {
+        if (strncmp(new_val, cur_val, max_length) != 0) {
             tick_value_change_obj = objects.axis2_textarea;
-            lv_textarea_set_text(objects.axis2_textarea, new_val_str);
+            lv_textarea_set_text(objects.axis2_textarea, new_val);
             tick_value_change_obj = NULL;
         }
     }

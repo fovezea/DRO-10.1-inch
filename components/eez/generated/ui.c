@@ -50,10 +50,7 @@ void ui_init() {
 }
 
 void ui_tick() {
-    // Only call tick_screen if we have a valid screen loaded
-    if (currentScreen >= 0) {
-        tick_screen(currentScreen);
-    }
+    tick_screen(currentScreen);
 }
 
 #endif
