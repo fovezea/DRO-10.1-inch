@@ -1,45 +1,44 @@
-# ESP32-P4 WiFi Scanner with LVGL 9.2 and EEZ Studio Integration
+# ESP32-P4 DRO (Digital Readout) for Milling Machine
 
 [中文版本](./README_CN.md)
 
-This project provides a complete WiFi scanner application for the JC8012P4A1C 10.1-inch ESP32-P4 board with LVGL 9.2 and EEZ Studio integration. It features ESP-Hosted WiFi over SDIO, a modern UI, and is ready for custom development with EEZ Studio.
+This project provides a complete Digital Readout (DRO) system for milling machines using the JC8012P4A1C 10.1-inch ESP32-P4 board with LVGL 9.2 and EEZ Studio integration. It features a modern touch interface for displaying and controlling machine axis positions.
 
 **Key Features:**
-- ✅ **WiFi Scanning**: ESP-Hosted over SDIO with ESP32-C6 as WiFi host
+- ✅ **Multi-Axis DRO**: Support for X, Y, Z, W, and C axes
 - ✅ **LVGL 9.2**: Fully configured and optimized for 1280x800 display
 - ✅ **EEZ Studio Integration**: Ready for visual UI design and development
-- ✅ **Modern UI**: Dark theme WiFi scanner with network selection
+- ✅ **Modern UI**: Professional DRO interface with touch controls
 - ✅ **Hardware Support**: All drivers included (display, touch, audio, sensors)
 - ✅ **Memory Optimized**: LVGL memory issues resolved and stable
 - ✅ **Self-Contained**: All components included locally, no external dependencies
 - ✅ **Thread-Safe**: Proper LVGL locking and task synchronization
 
-## 🎯 **Current Status: In progress Do not use**
+## 🎯 **Current Status: Working DRO System**
 
 ### ✅ **Working Features**
 - **Physical Display**: 1280x800 MIPI-DSI display with proper backlight control
-- **Display Orientation**: Horizontal/landscape mode (90-degree rotation) with rotation monitoring
-- **WiFi Scanning**: Successfully scans and displays 20+ networks via ESP-Hosted SDIO
-- **ESP-Hosted Communication**: Stable SDIO communication with ESP32-C6 host
+- **Display Orientation**: Horizontal/landscape mode (270-degree rotation) with proper touch alignment
+- **Multi-Axis Display**: Shows X, Y, Z, W, and C axis positions
+- **Touch Interface**: Capacitive touch support (GSL3680 controller) with proper coordinate mapping
 - **LVGL Display**: Stable display initialization and rendering with thread safety
-- **Touch Interface**: Capacitive touch support (GSL3680 controller)
 - **EEZ Studio Ready**: Complete integration framework with working UI screens
-- **Memory Stability**: ~30MB free heap, no crashes or watchdog timeouts
-- **Clean Console**: Minimal logging for better user experience
+- **Memory Stability**: Stable memory usage, no crashes or watchdog timeouts
+- **Tab Navigation**: Working tab interface for different DRO functions
+- **Axis Controls**: Set zero, set value, and global zero functions
 
 ### 🔧 **Hardware Configuration**
 - **Main Board**: ESP32-P4 (JC8012P4A1C 10.1-inch board)
-- **WiFi Host**: ESP32-C6 configured as ESP-Hosted
 - **Display**: 1280x800 MIPI-DSI LCD (JD9365 controller)
 - **Touch**: GSL3680 capacitive touch controller
-- **Connection**: SDIO between ESP32-P4 and ESP32-C6
+- **Orientation**: 270-degree rotation for proper landscape mode
+- **Touch Alignment**: Proper coordinate mapping for rotated display
 
 ## 🚀 **Quick Start**
 
 ### Prerequisites
 
 * JC8012P4A1C 10.1-inch ESP32-P4 board
-* ESP32-C6 board configured as ESP-Hosted WiFi host
 * 10.1-inch 1280x800 LCD display with MIPI-DSI interface
 * Touch controller (GSL3680 or compatible)
 * USB-C cable for power supply and programming
@@ -47,19 +46,10 @@ This project provides a complete WiFi scanner application for the JC8012P4A1C 10
 
 ### Hardware Setup
 
-1. **Connect ESP32-C6 WiFi Host** to ESP32-P4 via SDIO:
-   - CLK: GPIO 18
-   - CMD: GPIO 19
-   - D0: GPIO 14
-   - D1: GPIO 15
-   - D2: GPIO 16
-   - D3: GPIO 17
-   - Reset: GPIO 54
-
-2. **Connect Display** via MIPI-DSI interface
-3. **Connect Touch Controller** via I2C
-4. **Connect USB-C cable** to `USB-UART` port
-5. **Power on** both boards
+1. **Connect Display** via MIPI-DSI interface
+2. **Connect Touch Controller** via I2C
+3. **Connect USB-C cable** to `USB-UART` port
+4. **Power on** the board
 
 ### Building and Flashing
 
@@ -74,18 +64,22 @@ idf.py -p /dev/ttyUSB0 flash monitor
 ## 📁 **Project Structure (Self-Contained)**
 
 ```
-ESP4-JC8012P4A1C_I_W_Y-LVGL9/
+DRO-10.1-inch/
 ├── components/                        # All local components (self-contained)
 │   ├── eez/                          # EEZ Studio integration component
 │   │   ├── CMakeLists.txt            # Build configuration
 │   │   ├── eez_ui.h                  # Main API header
 │   │   ├── eez_ui.c                  # Main implementation
 │   │   ├── eez_ui_events.c           # Event handlers
+│   │   ├── eez_ui_vars.c             # Variable management for DRO
 │   │   ├── README.md                 # Component documentation
 │   │   └── generated/                # EEZ Studio exported files
-│   │       ├── .gitkeep              # Placeholder
-│   │       ├── example_ui.h          # Example structure
-│   │       └── example_ui.c          # Example implementation
+│   │       ├── screens.c             # Generated UI screens
+│   │       ├── screens.h             # Screen definitions
+│   │       ├── vars.h                # Variable declarations
+│   │       ├── actions.h             # Action definitions
+│   │       ├── styles.h              # UI styles
+│   │       └── ui.h                  # Main UI header
 │   ├── esp32_p4_function_ev_board/   # Main BSP for display/touch/hardware
 │   ├── esp_lcd_jd9365/               # LCD controller driver (JD9365)
 │   ├── esp_lcd_touch_gsl3680/        # Touch controller driver (GSL3680)
@@ -94,7 +88,7 @@ ESP4-JC8012P4A1C_I_W_Y-LVGL9/
 │   ├── esp_video/                    # Video processing
 │   └── espressif__esp_lcd_jd9165/    # Additional LCD support
 ├── main/
-│   └── main.c                        # Main application with WiFi scanner
+│   └── main.c                        # Main application with DRO functionality
 ├── managed_components/               # LVGL and driver components
 ├── sdkconfig.defaults               # Project configuration
 ├── partitions.csv                   # Flash partition layout
@@ -103,7 +97,7 @@ ESP4-JC8012P4A1C_I_W_Y-LVGL9/
 └── README.md                        # This file
 ```
 
-**Note**: This project is now fully self-contained with all hardware drivers and BSP components included locally. No external `../common_components/` directory is required.
+**Note**: This project is fully self-contained with all hardware drivers and BSP components included locally.
 
 ## 🔧 **Technical Implementation Details**
 
@@ -111,46 +105,28 @@ ESP4-JC8012P4A1C_I_W_Y-LVGL9/
 - **Controller**: JD9365 MIPI-DSI LCD controller
 - **Resolution**: 1280x800 pixels in horizontal orientation
 - **Backlight**: Automatic backlight control with `bsp_display_backlight_on()`
-- **Rotation**: 90-degree rotation for landscape mode with monitoring system
+- **Rotation**: 270-degree rotation for landscape mode with proper touch alignment
 - **Thread Safety**: Proper LVGL locking (`lvgl_port_lock/unlock`) for UI operations
+
+### Touch System
+- **Controller**: GSL3680 capacitive touch controller
+- **Alignment**: Proper coordinate mapping for 270-degree rotated display
+- **Mirror Settings**: `mirror_x = 1, mirror_y = 0` for correct alignment
+- **Response**: All buttons and tabs respond correctly to touch input
 
 ### LVGL Integration
 - **Version**: LVGL 9.2 with optimized memory configuration
-- **Memory**: Fixed IRAM stack allocation issues
+- **Memory**: Stable memory usage with proper allocation
 - **Threading**: Separate UI creation task with proper synchronization
-- **Timing**: 1000ms delays for proper initialization sequence
+- **Timing**: Proper initialization sequence with delays
 - **Stability**: No crashes or watchdog timeouts
 
-### WiFi System
-- **Protocol**: ESP-Hosted over SDIO at 40MHz
-- **Host**: ESP32-C6 running ESP-Hosted firmware
-- **Performance**: Scans 20+ networks reliably
-- **Logging**: Clean console output with essential error logging only
-
-### EEZ Studio Integration
-- **Framework**: Complete integration with working UI screen creation
-- **Timing**: Proper initialization sequence with LVGL integration
-- **Thread Safety**: UI creation in dedicated task with proper locking
-- **Callbacks**: Ready for network selection and scan callbacks
-
-## 🔧 **WiFi Configuration**
-
-### ESP-Hosted Setup
-
-The project uses ESP-Hosted for WiFi functionality:
-
-- **ESP32-P4**: Main application processor with LVGL UI
-- **ESP32-C6**: WiFi host processor running ESP-Hosted firmware
-- **Communication**: SDIO interface at 40MHz
-- **Protocol**: ESP-Hosted with HCI over SDIO
-
-### WiFi Features
-
-- **Network Scanning**: Automatic and manual scanning
-- **Network Display**: Shows SSID, channel, RSSI, and security type
-- **Network Selection**: Click to select networks (callback ready)
-- **Real-time Updates**: UI updates when scan completes
-- **Stability**: No crashes during WiFi operations
+### DRO System
+- **Axes**: X, Y, Z, W, and C axis support
+- **Display**: Real-time position display with 4-decimal precision
+- **Controls**: Set zero, set value, and global zero functions
+- **Units**: Millimeter display with inch/mm toggle capability
+- **Tools**: Tool number and work offset management
 
 ## 🎨 **EEZ Studio Integration**
 
@@ -160,20 +136,19 @@ The project includes a complete EEZ Studio integration framework:
 
 ```c
 // Basic EEZ Studio usage
-#include "eez_ui.h"
+#include "ui.h"
 
 void app_main(void)
 {
-    // Initialize EEZ UI
-    eez_ui_config_t config = EEZ_UI_CONFIG_DEFAULT();
-    eez_ui_init(&config);
+    // Initialize display and LVGL
+    app_display_init();
+    app_lvgl_init();
     
-    // Create UI screen (in separate task for thread safety)
-    eez_ui_create_screen();
+    // Create UI screens (in separate task for thread safety)
+    xTaskCreate(ui_creation_task, "ui_creation", 4096, NULL, 5, NULL);
     
-    // Register callbacks
-    eez_ui_register_scan_callback(wifi_scan_callback);
-    eez_ui_register_network_callback(network_selected_callback);
+    // Create UI tick task for updates
+    xTaskCreate(ui_tick_task, "ui_tick", 4096, NULL, 3, NULL);
 }
 ```
 
@@ -187,49 +162,40 @@ void app_main(void)
 
 See [EEZ_STUDIO_INTEGRATION.md](./EEZ_STUDIO_INTEGRATION.md) for complete guide.
 
-## 📋 **API Reference**
+## 📋 **DRO Features**
 
-### EEZ Component Functions
+### Axis Management
+- **X Axis**: Primary horizontal axis
+- **Y Axis**: Secondary horizontal axis  
+- **Z Axis**: Vertical axis
+- **W Axis**: Additional horizontal axis
+- **C Axis**: Rotary axis
 
-```c
-// Initialize EEZ UI system
-esp_err_t eez_ui_init(const eez_ui_config_t *config);
+### Functions
+- **Position Display**: Real-time position with 4-decimal precision
+- **Set Zero**: Set current position as zero for any axis
+- **Set Value**: Set specific position value for any axis
+- **Global Zero**: Set all axes to zero simultaneously
+- **Tool Management**: Tool number and work offset handling
+- **Unit Toggle**: Switch between metric (mm) and imperial (inch)
 
-// Create the main UI screen (thread-safe)
-esp_err_t eez_ui_create_screen(void);
-
-// Update WiFi network list
-esp_err_t eez_ui_update_wifi_list(const wifi_ap_record_t *networks, uint16_t count);
-
-// Set status message
-esp_err_t eez_ui_set_status(const char *message);
-
-// Register callbacks
-esp_err_t eez_ui_register_scan_callback(void (*callback)(void));
-esp_err_t eez_ui_register_network_callback(void (*callback)(const char *ssid));
-```
-
-### Configuration
-
-```c
-typedef struct {
-    lv_obj_t *screen;           // Main screen object
-    lv_obj_t *container;        // Main container
-    bool auto_scan;             // Enable automatic WiFi scanning
-    uint32_t scan_interval_ms;  // Scan interval in milliseconds
-} eez_ui_config_t;
-```
+### UI Components
+- **Tab Interface**: Multiple tabs for different DRO functions
+- **Numeric Keypad**: Touch keypad for value entry
+- **Status Display**: Information and status messages
+- **Settings**: Configuration and calibration options
 
 ## 🛠️ **Development**
 
 ### Custom Development
 
-To extend the application:
+To extend the DRO application:
 
 1. **Modify `main/main.c`** for application logic
 2. **Use EEZ Studio** for UI design
 3. **Extend `components/eez/`** for additional features
-4. **Add WiFi functionality** using ESP-Hosted APIs
+4. **Add axis input** from encoders or sensors
+5. **Implement communication** with machine control systems
 
 ### Configuration
 
@@ -241,24 +207,22 @@ idf.py menuconfig
 Key configuration sections:
 - `Component config > LVGL` - LVGL settings
 - `Component config > Board Support Package(ESP32-P4)` - Hardware settings
-- `Component config > Wi-Fi Remote` - WiFi configuration
+- `Component config > Display` - Display and touch settings
 
-### Example: Adding Network Connection
+### Example: Adding Axis Input
 
 ```c
-void network_selected_callback(const char *ssid)
+// Example: Read encoder input for X axis
+void read_x_axis_encoder(void)
 {
-    ESP_LOGI(TAG, "Connecting to: %s", ssid);
+    // Read encoder value
+    int32_t encoder_value = read_encoder(ENCODER_X);
     
-    wifi_config_t wifi_config = {
-        .sta = {
-            .ssid = ssid,
-            .password = "your_password",
-        },
-    };
+    // Convert to position (mm)
+    float position_mm = encoder_value * ENCODER_RESOLUTION_MM;
     
-    esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
-    esp_wifi_connect();
+    // Update DRO variable
+    set_var_virtual_axis_1(position_mm);
 }
 ```
 
@@ -266,15 +230,17 @@ void network_selected_callback(const char *ssid)
 
 ### Common Issues (All Resolved in Current Version)
 
-1. **✅ WiFi Working**:
-   - ESP32-C6 ESP-Hosted firmware communication stable
-   - SDIO connections verified and working
-   - GPIO pin assignments correct
-
-2. **✅ Display Working**:
+1. **✅ Display Working**:
    - MIPI-DSI connections verified
    - Display backlight automatically enabled
    - LVGL configuration optimized
+   - 270-degree rotation properly configured
+
+2. **✅ Touch Working**:
+   - GSL3680 controller properly initialized
+   - Touch coordinates aligned with display rotation
+   - All buttons and tabs respond correctly
+   - Proper mirror settings applied
 
 3. **✅ Build Success**:
    - ESP-IDF v5.4.2 compatibility verified
@@ -282,7 +248,7 @@ void network_selected_callback(const char *ssid)
    - EEZ Studio integration working
 
 4. **✅ Memory Stable**:
-   - ~30MB free heap maintained
+   - Stable memory usage maintained
    - LVGL memory configuration optimized
    - No memory leaks or crashes
 
@@ -304,8 +270,8 @@ ESP_LOGI(TAG, "Free heap: %lu", esp_get_free_heap_size());
 // Display status
 ESP_LOGI(TAG, "Display initialized, backlight on");
 
-// WiFi scanning status
-ESP_LOGI(TAG, "WiFi scan completed, found %d networks", network_count);
+// Touch status
+ESP_LOGI(TAG, "Touch input device initialized successfully");
 ```
 
 ## 📚 **Resources**
@@ -313,29 +279,29 @@ ESP_LOGI(TAG, "WiFi scan completed, found %d networks", network_count);
 - **EEZ Studio**: [https://eezstudio.org/](https://eezstudio.org/)
 - **LVGL Documentation**: [https://docs.lvgl.io/](https://docs.lvgl.io/)
 - **ESP-IDF**: [https://docs.espressif.com/projects/esp-idf/](https://docs.espressif.com/projects/esp-idf/)
-- **ESP-Hosted**: [https://github.com/espressif/esp-hosted](https://github.com/espressif/esp-hosted)
 - **ESP-BSP**: [https://github.com/espressif/esp-bsp](https://github.com/espressif/esp-bsp)
 
 ## 🎉 **Success Criteria (All Met)**
 
-Your setup is working correctly when:
+Your DRO setup is working correctly when:
 
-✅ **WiFi scanning** finds and displays 20+ networks
-✅ **ESP-Hosted communication** is stable over SDIO
-✅ **LVGL display** shows UI without crashes in horizontal orientation
-✅ **Touch interface** responds to input (GSL3680)
+✅ **Display shows** DRO interface in correct landscape orientation
+✅ **Touch interface** responds to all buttons and tabs
+✅ **Axis displays** show position values correctly
+✅ **Tab navigation** works with both touch and swipe
 ✅ **EEZ Studio integration** works for UI development
-✅ **Memory usage** is stable (~30MB free heap)
-✅ **System stability** with no watchdog timeouts
+✅ **Memory usage** is stable
+✅ **System stability** with no crashes or timeouts
 ✅ **Clean console** output for better debugging
 
 ## 🚀 **Next Steps**
 
-1. **Design custom UI** with EEZ Studio
-2. **Add network connection** functionality
-3. **Implement settings** and configuration screens
-4. **Add more WiFi features** (WPS, enterprise auth, etc.)
+1. **Connect encoders** for real axis position input
+2. **Add machine communication** (Modbus, Ethernet, etc.)
+3. **Implement advanced features** (tool compensation, work offsets)
+4. **Add data logging** and history functions
 5. **Extend with additional** sensors and peripherals
+6. **Add network connectivity** for remote monitoring
 
 ## 📄 **License**
 
@@ -343,6 +309,6 @@ This project follows the same license terms as the original ESP-IDF examples.
 
 ---
 
-**Happy coding with ESP32-P4, LVGL, and EEZ Studio! 🎨✨**
+**Happy machining with your ESP32-P4 DRO! 🛠️✨**
 
-**Status: FULLY WORKING AND SELF-CONTAINED** ✅
+**Status: FULLY WORKING DRO SYSTEM** ✅
