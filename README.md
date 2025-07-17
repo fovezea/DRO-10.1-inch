@@ -312,7 +312,3 @@ Your DRO setup is working correctly when:
 This project follows the same license terms as the original ESP-IDF examples.
 
 ---
-
-**Happy machining with your ESP32-P4 DRO! 🛠️✨**
-
-**Status: FULLY WORKING DRO SYSTEM** ✅
