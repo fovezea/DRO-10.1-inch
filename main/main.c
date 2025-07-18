@@ -253,8 +253,8 @@ static void ui_tick_task(void *pvParameters)
         // Unlock LVGL
         lvgl_port_unlock();
         
-        // Tick every 10ms (100Hz)
-        vTaskDelay(pdMS_TO_TICKS(10));
+        // Tick every 8ms (125Hz) - stable rate
+        vTaskDelay(pdMS_TO_TICKS(8));
     }
 }
 
@@ -347,8 +347,8 @@ void app_main(void)
     // Create UI creation task (higher priority to run first)
     xTaskCreate(ui_creation_task, "ui_creation", 4096, NULL, 5, NULL);
     
-    // Create UI tick task for EEZ Studio (lower priority to run after UI creation)
-    xTaskCreate(ui_tick_task, "ui_tick", 4096, NULL, 3, NULL);
+    // Create UI tick task for EEZ Studio (slightly higher priority)
+    xTaskCreate(ui_tick_task, "ui_tick", 4096, NULL, 5, NULL);
     
     // Create system monitor task
     xTaskCreate(system_monitor_task, "system_monitor", 4096, NULL, 1, NULL);
