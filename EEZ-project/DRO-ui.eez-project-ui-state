@@ -1,8 +1,9 @@
 {
   "navigation": {
     "selectedUserPageObject": "[..\\..\\..\\..\\eez-projects\\DRO-frontend-ui\\DRO-frontend-ui.eez-project]:/userPages/0",
-    "selectedGlobalVariableObject": "[..\\..\\..\\..\\eez-projects\\DRO-frontend-ui\\DRO-frontend-ui.eez-project]:/variables/globalVariables/0",
-    "selectedStyleObject": "[..\\..\\..\\..\\eez-projects\\DRO-frontend-ui\\DRO-frontend-ui.eez-project]:/lvglStyles/styles/3",
+    "selectedActionObject": "[..\\..\\..\\..\\eez-projects\\DRO-frontend-ui\\DRO-frontend-ui.eez-project]:/actions/0",
+    "selectedGlobalVariableObject": "[..\\..\\..\\..\\eez-projects\\DRO-frontend-ui\\DRO-frontend-ui.eez-project]:/variables/globalVariables/6",
+    "selectedStyleObject": "[..\\..\\..\\..\\eez-projects\\DRO-frontend-ui\\DRO-frontend-ui.eez-project]:/lvglStyles/styles/7",
     "subnavigationSelectedItems": {
       "variables-tab/sub-navigation/selected-item": "Global"
     }
@@ -26,7 +27,7 @@
           {
             "type": "border",
             "selected": 0,
-            "size": 57.5,
+            "size": 192.5,
             "location": "right",
             "children": [
               {
@@ -121,14 +122,13 @@
             {
               "type": "row",
               "id": "#d4f3ac3e-8a91-44ef-83dc-32b3bca9ca28",
-              "weight": 0,
-              "width": 350,
+              "weight": 14.387887450700116,
+              "width": 254,
               "children": [
                 {
                   "type": "tabset",
                   "id": "#affdd582-2622-4213-81de-1ac9c80082e5",
                   "weight": 1,
-                  "selected": 1,
                   "enableClose": false,
                   "children": [
                     {
@@ -160,7 +160,7 @@
                 {
                   "type": "tabset",
                   "id": "#97266a87-17fc-430e-a915-81f134f53dfe",
-                  "weight": 1,
+                  "weight": 0.994059405940594,
                   "enableClose": false,
                   "children": [
                     {
@@ -171,12 +171,13 @@
                       "enableClose": false,
                       "icon": "svg:hierarchy"
                     }
-                  ]
+                  ],
+                  "active": true
                 },
                 {
                   "type": "tabset",
                   "id": "#c44abdbb-4651-41a9-8887-885a161fdc61",
-                  "weight": 1,
+                  "weight": 1.005940594059406,
                   "enableClose": false,
                   "children": [
                     {
@@ -194,23 +195,33 @@
             {
               "type": "tabset",
               "id": "EDITORS",
-              "weight": 75.13812154696133,
-              "selected": -1,
+              "weight": 57.85248975204261,
               "enableDeleteWhenEmpty": false,
               "enableClose": false,
-              "children": [],
-              "active": true
+              "children": [
+                {
+                  "type": "tab",
+                  "id": "#95c02fd4-fe11-4d2c-8d0c-56339669fb08",
+                  "name": "Main",
+                  "component": "editor",
+                  "config": {
+                    "objectPath": "[..\\..\\..\\..\\eez-projects\\DRO-frontend-ui\\DRO-frontend-ui.eez-project]:/userPages/0",
+                    "permanent": false
+                  },
+                  "icon": "svg:page"
+                }
+              ]
             },
             {
               "type": "row",
               "id": "#c9361652-4e0d-4db3-86f8-9ae48a1fbf0e",
-              "weight": 24.861878453038674,
-              "width": 270,
+              "weight": 27.759622797257258,
+              "width": 464,
               "children": [
                 {
                   "type": "tabset",
                   "id": "#fe3ae5ce-2c9c-4357-a7ff-88604ad740e1",
-                  "weight": 2,
+                  "weight": 1.2536136662286466,
                   "children": [
                     {
                       "type": "tab",
@@ -225,7 +236,7 @@
                 {
                   "type": "tabset",
                   "id": "#d62c314e-d931-4c58-be3d-77ea38150d8b",
-                  "weight": 1,
+                  "weight": 1.7463863337713534,
                   "children": [
                     {
                       "type": "tab",
@@ -815,7 +826,8 @@
                       "component": "themes",
                       "enableClose": false
                     }
-                  ]
+                  ],
+                  "active": true
                 },
                 {
                   "type": "tabset",
@@ -998,24 +1010,80 @@
       "3": {},
       "4": {}
     },
-    "[..\\..\\..\\..\\eez-projects\\DRO-frontend-ui\\DRO-frontend-ui.eez-project]:/lvglStyles/styles[tree-state]": {},
+    "[..\\..\\..\\..\\eez-projects\\DRO-frontend-ui\\DRO-frontend-ui.eez-project]:/lvglStyles/styles[tree-state]": {
+      "0": {},
+      "1": {},
+      "2": {},
+      "3": {},
+      "4": {},
+      "5": {},
+      "6": {},
+      "7": {
+        "$selected": true
+      }
+    },
     "[..\\..\\..\\..\\eez-projects\\DRO-frontend-ui\\DRO-frontend-ui.eez-project]:/userPages/0[flow-state]": {
       "selection": {
         "0": {
           "0": {
-            "1": {},
-            "2": {},
-            "9": {},
-            "$selected": true
+            "0": {
+              "0": {},
+              "1": {},
+              "2": {},
+              "3": {},
+              "4": {},
+              "5": {},
+              "6": {},
+              "7": {},
+              "8": {},
+              "9": {},
+              "14": {
+                "0": {}
+              },
+              "17": {},
+              "18": {},
+              "19": {},
+              "20": {},
+              "21": {},
+              "22": {},
+              "29": {},
+              "$selected": true
+            }
           }
         }
       },
       "transform": {
         "translate": {
-          "x": -400,
-          "y": -240
+          "x": -502.08949739936713,
+          "y": -298.6893980028833
         },
-        "scale": 1
+        "scale": 0.75
+      },
+      "timeline": {
+        "isEditorActive": false,
+        "position": 0,
+        "secondToPx": 200,
+        "scrollLeft": 0
+      }
+    },
+    "[..\\..\\..\\..\\eez-projects\\DRO-frontend-ui\\DRO-frontend-ui.eez-project]:/userPages/1[flow-state]": {
+      "selection": {
+        "0": {
+          "0": {
+            "0": {},
+            "2": {},
+            "5": {
+              "$selected": true
+            }
+          }
+        }
+      },
+      "transform": {
+        "translate": {
+          "x": -418.81,
+          "y": -218.09781250000015
+        },
+        "scale": 0.75
       },
       "timeline": {
         "isEditorActive": false,
@@ -1041,13 +1109,14 @@
   "lvglState": "DEFAULT",
   "lvglExpandedPropertiesGroup": [
     "POSITION AND SIZE",
-    "LAYOUT",
     "TEXT",
-    "MISCELLANEOUS",
-    "BACKGROUND"
+    "BACKGROUND",
+    "BORDER",
+    "ARC",
+    "MISCELLANEOUS"
   ],
   "showInactiveFlowsInDebugger": true,
   "globalFlowZoom": true,
-  "flowZoom": 1,
+  "flowZoom": 0.75,
   "implementationLanguage": "C"
 }

@@ -198,6 +198,19 @@ To extend the DRO application:
 1. **Modify `main/main.c`** for application logic
 2. **Use EEZ Studio** for UI design
 3. **Extend `components/eez/`** for additional features
+
+## 📦 **Project Moving Guide**
+
+When moving this project to a different location, you may encounter configuration errors related to manifest files. See [PROJECT_MOVING_GUIDE.md](./PROJECT_MOVING_GUIDE.md) for complete instructions.
+
+**Quick fix:**
+```bash
+# Run the automated fix script
+python fix_manifest_paths.py --backup
+
+# Test the configuration
+idf.py reconfigure
+```
 4. **Add axis input** from encoders or sensors
 5. **Implement communication** with machine control systems
 

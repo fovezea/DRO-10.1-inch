@@ -134,7 +134,11 @@ int rpc_parse_rsp(Rpc *rpc_msg, ctrl_cmd_t *app_resp)
 
 	/* 3. parse Rpc into ctrl_cmd_t */
 	switch (rpc_msg->msg_id) {
-
+	case RPC_ID__Resp_Base : {
+		// RPC Request not supported
+		app_resp->resp_event_status = ESP_ERR_NOT_SUPPORTED;
+		goto fail_parse_rpc_msg;
+	}
 	case RPC_ID__Resp_GetMACAddress : {
 		RPC_FAIL_ON_NULL(resp_get_mac_address);
 		RPC_ERR_IN_RESP(resp_get_mac_address);
@@ -246,10 +250,7 @@ int rpc_parse_rsp(Rpc *rpc_msg, ctrl_cmd_t *app_resp)
 			RPC_RSP_COPY_BYTES(p_a_sta->password, p_c_sta->password);
 			p_a_sta->scan_method = p_c_sta->scan_method;
 			p_a_sta->bssid_set = p_c_sta->bssid_set;
-
-			if (p_a_sta->bssid_set)
-				RPC_RSP_COPY_BYTES(p_a_sta->bssid, p_c_sta->bssid);
-
+			RPC_RSP_COPY_BYTES(p_a_sta->bssid, p_c_sta->bssid);
 			p_a_sta->channel = p_c_sta->channel;
 			p_a_sta->listen_interval = p_c_sta->listen_interval;
 			p_a_sta->sort_method = p_c_sta->sort_method;
@@ -629,6 +630,10 @@ int rpc_parse_rsp(Rpc *rpc_msg, ctrl_cmd_t *app_resp)
 			rpc_msg->resp_wifi_get_bandmode->bandmode;
 		break;
 #endif
+	} case RPC_ID__Resp_SetDhcpDnsStatus: {
+		RPC_FAIL_ON_NULL(resp_set_dhcp_dns);
+		RPC_ERR_IN_RESP(resp_set_dhcp_dns);
+		break;
 	} default: {
 		ESP_LOGE(TAG, "Unsupported rpc Resp[%u]", rpc_msg->msg_id);
 		goto fail_parse_rpc_msg;

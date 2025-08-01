@@ -29,7 +29,8 @@
  #define JD9365_DSI_4_LANE       (0x11)
  
  #define JD9365_CMD_GS_BIT       (1 << 0)
- #define JD9365_CMD_SS_BIT       (1 << 1)
+#define JD9365_CMD_SS_BIT       (1 << 1)
+#define JD9365_CMD_MV_BIT       (1 << 5)  // Page/Column Order (X/Y swap)
  
  typedef struct {
      esp_lcd_panel_io_handle_t io;
@@ -54,6 +55,7 @@
  static esp_err_t panel_jd9365_reset(esp_lcd_panel_t *panel);
  static esp_err_t panel_jd9365_invert_color(esp_lcd_panel_t *panel, bool invert_color_data);
  static esp_err_t panel_jd9365_mirror(esp_lcd_panel_t *panel, bool mirror_x, bool mirror_y);
+ static esp_err_t panel_jd9365_swap_xy(esp_lcd_panel_t *panel, bool swap_xy);
  static esp_err_t panel_jd9365_disp_on_off(esp_lcd_panel_t *panel, bool on_off);
  
  esp_err_t esp_lcd_new_panel_jd9365(const esp_lcd_panel_io_handle_t io, const esp_lcd_panel_dev_config_t *panel_dev_config,
@@ -126,6 +128,7 @@
      panel_handle->init = panel_jd9365_init;
      panel_handle->reset = panel_jd9365_reset;
      panel_handle->mirror = panel_jd9365_mirror;
+     panel_handle->swap_xy = panel_jd9365_swap_xy;
      panel_handle->invert_color = panel_jd9365_invert_color;
      panel_handle->disp_on_off = panel_jd9365_disp_on_off;
      panel_handle->user_data = jd9365;
@@ -564,6 +567,35 @@
  
      return ESP_OK;
  }
+ 
+ static esp_err_t panel_jd9365_swap_xy(esp_lcd_panel_t *panel, bool swap_xy)
+{
+    jd9365_panel_t *jd9365 = (jd9365_panel_t *)panel->user_data;
+    esp_lcd_panel_io_handle_t io = jd9365->io;
+    uint8_t madctl_val = jd9365->madctl_val;
+
+    ESP_RETURN_ON_FALSE(io, ESP_ERR_INVALID_STATE, TAG, "invalid panel IO");
+
+    // Debug: Print swap_xy call
+    ESP_LOGI(TAG, "JD9365 swap_xy called: swap_xy=%d, current MADCTL=0x%02X", swap_xy, madctl_val);
+
+    // Control swap_xy through JD9365 MV bit (Page/Column Selection)
+    if (swap_xy) {
+        madctl_val |= JD9365_CMD_MV_BIT;  // Enable row/column exchange
+        ESP_LOGI(TAG, "Setting MV bit (0x%02X), new MADCTL=0x%02X", JD9365_CMD_MV_BIT, madctl_val);
+    } else {
+        madctl_val &= ~JD9365_CMD_MV_BIT; // Disable row/column exchange
+        ESP_LOGI(TAG, "Clearing MV bit (0x%02X), new MADCTL=0x%02X", JD9365_CMD_MV_BIT, madctl_val);
+    }
+
+    ESP_RETURN_ON_ERROR(esp_lcd_panel_io_tx_param(io, LCD_CMD_MADCTL, (uint8_t []) {
+        madctl_val
+    }, 1), TAG, "send command failed");
+    jd9365->madctl_val = madctl_val;
+
+    ESP_LOGI(TAG, "JD9365 swap_xy result: new MADCTL=0x%02X", madctl_val);
+    return ESP_OK;
+}
  
  static esp_err_t panel_jd9365_disp_on_off(esp_lcd_panel_t *panel, bool on_off)
  {

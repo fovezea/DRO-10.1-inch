@@ -37,6 +37,10 @@ if(CONFIG_ESP_HOSTED_ENABLED)
 	# host ESP32 specific files
 	list(APPEND srcs "${host_dir}/port/esp/freertos/src/esp_hosted_ota.c")
 
+	# cli
+	list(APPEND srcs "${common_dir}/utils/esp_hosted_cli.c")
+	list(APPEND priv_include "${common_dir}/utils")
+
 	# bt (NimBLE)
 	### TODO config for HCI over UART
 	list(APPEND priv_include "${host_dir}/drivers/bt")
@@ -45,6 +49,10 @@ if(CONFIG_ESP_HOSTED_ENABLED)
 	else()
 		list(APPEND srcs "${host_dir}/drivers/bt/hci_stub_drv.c")
 	endif()
+
+	# power save
+	list(APPEND priv_include "${host_dir}/drivers/power_save")
+	list(APPEND srcs "${host_dir}/drivers/power_save/power_save_drv.c")
 
 	# transport files
 	if(CONFIG_ESP_HOSTED_SDIO_HOST_INTERFACE)
@@ -76,7 +84,7 @@ if(CONFIG_ESP_HOSTED_ENABLED)
 endif()
 
 idf_component_register(SRCS ${srcs}
-	PRIV_REQUIRES soc esp_event esp_netif esp_timer driver esp_wifi bt esp_http_client
+	PRIV_REQUIRES soc esp_event esp_netif esp_timer driver esp_wifi bt esp_http_client console
 	INCLUDE_DIRS ${pub_include}
 	PRIV_INCLUDE_DIRS ${priv_include})
 
@@ -92,3 +100,15 @@ endif()
 # 	# used to workaround SPI transfer issue
 # 	idf_component_optional_requires(PRIVATE esp_mm)
 # endif()
+
+
+idf_component_get_property(lwip lwip COMPONENT_LIB)
+if(TARGET ${lwip})
+	# Use generator expressions to only apply to non-INTERFACE targets
+	get_target_property(lwip_type ${lwip} TYPE)
+	if(NOT lwip_type STREQUAL "INTERFACE_LIBRARY")
+		message(STATUS "********** Configuring LWIP for network split mode with custom hook **********")
+		target_include_directories(${lwip} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/common")
+		target_compile_definitions(${lwip} PRIVATE "-DESP_IDF_LWIP_HOOK_FILENAME=\"${CMAKE_CURRENT_SOURCE_DIR}/common/esp_hosted_lwip_src_port_hook.h\"")
+	endif()
+endif()

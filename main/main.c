@@ -27,9 +27,9 @@
 // Include BSP for ESP32-P4 board
 #include "bsp/esp32_p4_function_ev_board.h"
 
-// Display configuration - restore to working resolution
-#define LCD_H_RES              1280
-#define LCD_V_RES              800
+// Does anyone use these? (LCD_H_RES, LCD_V_RES)
+// #define LCD_H_RES              1280
+// #define LCD_V_RES              800
 
 // Forward declarations for callbacks
 static void wifi_scan_callback(void);
@@ -222,12 +222,14 @@ static void ui_creation_task(void *pvParameters)
     // Lock LVGL for thread safety
     lvgl_port_lock(0);
     
+    // Set display rotation to 270° landscape
+    lv_display_set_rotation(lvgl_disp, LV_DISPLAY_ROTATION_270);
+    
     // Initialize EEZ Studio generated UI
     ui_init();
     
-    // Ensure display rotation is still correct after UI creation
-    lv_display_set_rotation(lvgl_disp, LV_DISPLAY_ROTATION_270);
-    ESP_LOGI(TAG, "Display rotation re-confirmed as 270 degrees (landscape) after UI creation");
+    // UI creation complete
+    ESP_LOGI(TAG, "UI creation complete");
     
     // Unlock LVGL after all UI creation is complete
     lvgl_port_unlock();
@@ -270,15 +272,7 @@ static void system_monitor_task(void *pvParameters)
         ESP_LOGI(TAG, "Free internal heap: %lu bytes", esp_get_free_internal_heap_size());
         ESP_LOGI(TAG, "Task count: %d", uxTaskGetNumberOfTasks());
         
-        // Check if display rotation has changed
-        if (lvgl_disp != NULL) {
-            lv_display_rotation_t current_rotation = lv_display_get_rotation(lvgl_disp);
-            if (current_rotation != LV_DISPLAY_ROTATION_270) {
-                ESP_LOGW(TAG, "Display rotation changed from 270 to %d! Correcting...", current_rotation);
-                lv_display_set_rotation(lvgl_disp, LV_DISPLAY_ROTATION_270);
-                ESP_LOGI(TAG, "Display rotation corrected back to 270 degrees (landscape)");
-            }
-        }
+        // Display rotation is handled by BSP - no need to check or correct
         
         vTaskDelay(pdMS_TO_TICKS(10000)); // Print every 10 seconds
     }
@@ -300,10 +294,10 @@ static esp_err_t app_display_init(void)
             ESP_LOGE(TAG, "Failed to turn on display backlight: %s", esp_err_to_name(backlight_ret));
         }
         
-        // Set display orientation to landscape (270 degrees)
-        lv_display_set_rotation(lv_disp, LV_DISPLAY_ROTATION_270);
-        ESP_LOGI(TAG, "Display rotation set to 270 degrees (landscape) in app_display_init");
+        // Set initial rotation to 270° landscape
+        lv_display_set_rotation(lvgl_disp, LV_DISPLAY_ROTATION_270);
         
+        ESP_LOGI(TAG, "Display initialized with LVGL software rotation");
         return ESP_OK;
     } else {
         ESP_LOGE(TAG, "BSP display initialization failed");

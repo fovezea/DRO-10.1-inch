@@ -19,11 +19,7 @@
 #include "sd_pwr_ctrl_by_on_chip_ldo.h"
 
 
-#if CONFIG_BSP_LCD_TYPE_1024_600
-#include "esp_lcd_ek79007.h"
-#else
-#include "esp_lcd_ili9881c.h"
-#endif
+
 #include "esp_lcd_jd9365.h"
 #include "esp_lcd_touch_gsl3680.h"
 
@@ -436,41 +432,14 @@ esp_err_t bsp_display_new_with_handles(const bsp_display_config_t *config, bsp_l
     esp_lcd_panel_io_handle_t io;
     esp_lcd_dbi_io_config_t dbi_config = {
         .virtual_channel = 0,
-        .lcd_cmd_bits = 8,   // according to the LCD ILI9881C spec
-        .lcd_param_bits = 8, // according to the LCD ILI9881C spec
+        .lcd_cmd_bits = 8,   // according to the LCD JD9365 spec
+        .lcd_param_bits = 8, // according to the LCD JD9365 spec
     };
     ESP_GOTO_ON_ERROR(esp_lcd_new_panel_io_dbi(mipi_dsi_bus, &dbi_config, &io), err, TAG, "New panel IO failed");
 
     esp_lcd_panel_handle_t disp_panel = NULL;
-#if CONFIG_BSP_LCD_TYPE_1024_600
-    // create EK79007 control panel
-    ESP_LOGI(TAG, "Install EK79007 LCD control panel");
-
-#if CONFIG_BSP_LCD_COLOR_FORMAT_RGB888
-    esp_lcd_dpi_panel_config_t dpi_config = EK79007_1024_600_PANEL_60HZ_CONFIG(LCD_COLOR_PIXEL_FORMAT_RGB888);
-#else
-    esp_lcd_dpi_panel_config_t dpi_config = EK79007_1024_600_PANEL_60HZ_CONFIG(LCD_COLOR_PIXEL_FORMAT_RGB565);
-#endif
-    dpi_config.num_fbs = CONFIG_BSP_LCD_DPI_BUFFER_NUMS;
-
-    ek79007_vendor_config_t vendor_config = {
-        .mipi_config = {
-            .dsi_bus = mipi_dsi_bus,
-            .dpi_config = &dpi_config,
-        },
-    };
-    esp_lcd_panel_dev_config_t lcd_dev_config = {
-        .bits_per_pixel = 16,
-        .rgb_ele_order = BSP_LCD_COLOR_SPACE,
-        .reset_gpio_num = BSP_LCD_RST,
-        .vendor_config = &vendor_config,
-    };
-    ESP_GOTO_ON_ERROR(esp_lcd_new_panel_ek79007(io, &lcd_dev_config, &disp_panel), err, TAG, "New LCD panel EK79007 failed");
-    ESP_GOTO_ON_ERROR(esp_lcd_panel_reset(disp_panel), err, TAG, "LCD panel reset failed");
-    ESP_GOTO_ON_ERROR(esp_lcd_panel_init(disp_panel), err, TAG, "LCD panel init failed");
-#else
-    // create ILI9881C control panel
-    ESP_LOGI(TAG, "Install ILI9881C LCD control panel");
+    // create JD9365 control panel
+    ESP_LOGI(TAG, "Install JD9365 LCD control panel");
 #if CONFIG_BSP_LCD_COLOR_FORMAT_RGB888
     esp_lcd_dpi_panel_config_t dpi_config = JD9365_800_1280_PANEL_60HZ_DPI_CONFIG(LCD_COLOR_PIXEL_FORMAT_RGB888);
 #else
@@ -491,11 +460,10 @@ esp_err_t bsp_display_new_with_handles(const bsp_display_config_t *config, bsp_l
         .bits_per_pixel = 16,
         .vendor_config = &vendor_config,
     };
-    ESP_GOTO_ON_ERROR(esp_lcd_new_panel_jd9365(io, &lcd_dev_config, &disp_panel), err, TAG, "New LCD panel ILI9881C failed");
+    ESP_GOTO_ON_ERROR(esp_lcd_new_panel_jd9365(io, &lcd_dev_config, &disp_panel), err, TAG, "New LCD panel JD9365 failed");
     ESP_GOTO_ON_ERROR(esp_lcd_panel_reset(disp_panel), err, TAG, "LCD panel reset failed");
     ESP_GOTO_ON_ERROR(esp_lcd_panel_init(disp_panel), err, TAG, "LCD panel init failed");
     ESP_GOTO_ON_ERROR(esp_lcd_panel_disp_on_off(disp_panel, true), err, TAG, "LCD panel ON failed");
-#endif
 
     /* Return all handles */
     ret_handles->io = io;
@@ -537,13 +505,8 @@ esp_err_t bsp_touch_new(const bsp_touch_config_t *config, esp_lcd_touch_handle_t
         },
         .flags = {
             .swap_xy = 0,
-#if CONFIG_BSP_LCD_TYPE_1024_600
-            .mirror_x = 1,
-            .mirror_y = 1,
-#else
             .mirror_x = 1,
             .mirror_y = 0,
-#endif
         },
     };
     esp_lcd_panel_io_handle_t tp_io_handle = NULL;
@@ -573,9 +536,9 @@ static lv_display_t *bsp_display_lcd_init(const bsp_display_cfg_t *cfg)
         .monochrome = false,
         /* Rotation values must be same as used in esp_lcd for initial settings of the screen */
         .rotation = {
-            .swap_xy = false,
-            .mirror_x = true,
-            .mirror_y = true,
+            .swap_xy = false,  // Back to neutral - let LVGL handle rotation
+            .mirror_x = false,
+            .mirror_y = false,
         },
 #if LVGL_VERSION_MAJOR >= 9
 #if CONFIG_BSP_LCD_COLOR_FORMAT_RGB888
@@ -593,7 +556,7 @@ static lv_display_t *bsp_display_lcd_init(const bsp_display_cfg_t *cfg)
 #if CONFIG_BSP_DISPLAY_LVGL_AVOID_TEAR
             .sw_rotate = false,                /* Avoid tearing is not supported for SW rotation */
 #else
-            .sw_rotate = cfg->flags.sw_rotate, /* Only SW rotation is supported for 90° and 270° */
+            .sw_rotate = true,                 /* Use LVGL software rotation */
 #endif
 #if CONFIG_BSP_DISPLAY_LVGL_FULL_REFRESH
             .full_refresh = true,
@@ -643,8 +606,8 @@ lv_display_t *bsp_display_start(void)
 #else
             .buff_dma = true,
 #endif
-            .buff_spiram = false,
-            .sw_rotate = true,
+            .buff_spiram = true,  // Use PSRAM to avoid cache sync issues
+            .sw_rotate = true,   // Use LVGL software rotation (was working before)
         }
     };
     return bsp_display_start_with_config(&cfg);

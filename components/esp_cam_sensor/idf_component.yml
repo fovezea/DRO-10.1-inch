@@ -8,7 +8,6 @@ issues: https://github.com/espressif/esp-video-components/issues
 repository: git://github.com/espressif/esp-video-components.git
 repository_info:
   commit_sha: 1f6d809cee84b99202dcf39db367093067c1d52e
-  path: esp_cam_sensor
 targets:
 - esp32p4
 url: https://github.com/espressif/esp-video-components/tree/master/esp_cam_sensor

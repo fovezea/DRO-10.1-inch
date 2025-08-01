@@ -177,32 +177,34 @@ For optimal performance and reliability in production designs:
 
 Setting up the hardware involves connecting the master and co-processor devices via the SPI pins and ensuring all extra GPIO signals are properly connected. Below is the table of connections for the SPI full duplex setup between an host ESP chipset and another ESP chipset as co-processor:
 
-
 ### Host connections
 
-| Signal      | ESP32 | ESP32-S2/S3 | ESP32-C2/C3/C5/C6 | ESP32-P4 (ESP32-P4-Function-EV-Board) |
-|-------------|-------|-------------|-------------------|---------------------------------------|
-| CLK         | 14    | 12          | 6                 | 18                                    |
-| MOSI        | 13    | 11          | 7                 | 14                                    |
-| MISO        | 12    | 13          | 2                 | 15                                    |
-| CS          | 15    | 10          | 10                | 19                                    |
-| Handshake   | 26    | 17          | 3                 | 16                                    |
-| Data Ready  | 4     | 4           | 4                 | 17                                    |
-| Reset Out   | 5     | 5           | 5                 | 54                                    |
+| Signal      | ESP32 | ESP32-S2/S3 | ESP32-C2/C3/C5/C6 | ESP32-P4 |
+|-------------|-------|-------------|-------------------|----------|
+| CLK         | 14    | 12          | 6                 | 9        |
+| MOSI        | 13    | 11          | 7                 | 8        |
+| MISO        | 12    | 13          | 2                 | 10       |
+| CS          | 15    | 10          | 10                | 7        |
+| Handshake   | 26    | 17          | 3                 | 6        |
+| Data Ready  | 4     | 4           | 4                 | 11       |
+| Reset Out   | 5     | 5           | 5                 | 12       |
 
+> [!NOTE]
+> The GPIOs pins on the ESP32-P4 are SPI IO_MUX pins and powered by the `VDD_LP` pin. If you use a different set of GPIOs, check that they are powered to 3.3V by the pin(s) providing power for the GPIOs based on your ESP32-P4 schematic. See the ESP32-P4 Datasheet, [Table 2-1. Pin Overview](https://www.espressif.com/sites/default/files/documentation/esp32-p4_datasheet_en.pdf#table.2.1), for a list of GPIO pins and the pins providing the power for the GPIOs.
+>
+> If the pins providing power are connected to an internal Low Dropout Voltage Regulator (LDO), set the LDO to output 3.3V. See [Low Dropout Voltage Regulator (LDO)](https://docs.espressif.com/projects/esp-idf/en/latest/esp32p4/api-reference/peripherals/ldo_regulator.html) for more information on programming the internal LDOs.
 
 ### Co-processor connections
 
 | Signal      | ESP32 | ESP32-C2/C3/C5/C6 | ESP32-S2/S3 | ESP32-C6 on ESP32-P4-Function-EV-Board |
-|-------------|-------|-------------------|-------------|---------------------------------------|
-| CLK         | 14    | 6                 | 12          | 19                                    |
-| MOSI        | 13    | 7                 | 11          | 20                                    |
-| MISO        | 12    | 2                 | 13          | 21                                    |
-| CS          | 15    | 10                | 10          | 18                                    |
-| Handshake   | 26    | 3                 | 17          | 22                                    |
-| Data Ready  | 4     | 4                 | 5           | 23                                    |
-| Reset In    | EN    | EN/RST            | EN/RST      | EN/RST                                |
-
+|-------------|-------|-------------------|-------------|----------------------------------------|
+| CLK         | 14    | 6                 | 12          | 19                                     |
+| MOSI        | 13    | 7                 | 11          | 20                                     |
+| MISO        | 12    | 2                 | 13          | 21                                     |
+| CS          | 15    | 10                | 10          | 18                                     |
+| Handshake   | 26    | 3                 | 17          | 22                                     |
+| Data Ready  | 4     | 4                 | 5           | 23                                     |
+| Reset In    | EN    | EN/RST            | EN/RST      | EN/RST                                 |
 
 > [!NOTE]
 > - Always try to use IO_MUX pins from the datasheet for optimal performance on both sides.
@@ -269,13 +271,17 @@ idf.py menuconfig
 ```
 
 #### 7.2.1 Transport config
-  - Navigate to "Example configuration" -> "Transport layer"
-  - Select "SPI Full-duplex"
-
+Navigate & change to following
+```
+-- "Example configuration"
+    └── "Bus Config in between Host and Co-processor"
+        └── "Transport layer"
+            └── Select "SPI Full-duplex"
+```
 #### 7.2.2 Any other config
    Optionally, configure any additional SPI-specific settings under "SPI Full-duplex"
   - Set the GPIO pins for SPI signals (MOSI, MISO, CLK, CS), Handshake, Data Ready, Reset
-  - Configure SPI mode (0, 1, 2, or 3)
+  - Configure SPI mode (1, 2, or 3)
   - Set the SPI clock frequency
   - Checksum enable/disable (Checksum is recommended to be enabled as spi hardware doesn't have any error detection)
 
@@ -445,7 +451,7 @@ If you happen to have both, host and co-processor as same ESP chipset type (for 
    ESP-Hosted-MCU host configurations are available under "Component config" -> "ESP-Hosted config"
    1. Select "SPI Full-duplex" as the transport layer
    2. Change co chipset to connect to under "slave chipset to be used"
-   3. Optionally, configure SPI-specific settings like
+   3. Optionally, configure SPI-specific settings in the "SPI Configuration" menu, like:
    - SPI Clock Freq (MHz)
    - SPI Mode
    - SPI Pins
