@@ -1,3 +1,7 @@
+## 1.1.1
+
+- Clean up the component dependency, don't depend on the `driver` component directly
+
 ## 1.1.0
 
 - Supported communicating with ESP32C6 SDIO Slave
@@ -9,4 +13,4 @@
 
 ## 1.0.0
 
-- Inititial version
+- Initial version

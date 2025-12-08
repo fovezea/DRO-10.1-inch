@@ -1,26 +1,15 @@
-// Copyright 2015-2021 Espressif Systems (Shanghai) PTE LTD
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+ * SPDX-FileCopyrightText: 2015-2025 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
 
 #include "mempool.h"
-#include "common.h"
-#include "esp_hosted_config.h"
 #include "transport_drv.h"
 #include "spi_drv.h"
 #include "serial_drv.h"
 #include "esp_hosted_transport.h"
-#include "esp_log.h"
 #include "esp_hosted_log.h"
 #include "stats.h"
 #include "hci_drv.h"
@@ -28,6 +17,10 @@
 #include "power_save_drv.h"
 #include "esp_hosted_power_save.h"
 #include "esp_hosted_transport_config.h"
+#include "esp_hosted_bt.h"
+#include "port_esp_hosted_host_config.h"
+#include "port_esp_hosted_host_log.h"
+#include "port_esp_hosted_host_os.h"
 
 DEFINE_LOG_TAG(spi);
 
@@ -63,47 +56,6 @@ static void spi_transaction_task(void const* pvParameters);
 static void spi_process_rx_task(void const* pvParameters);
 static uint8_t * get_next_tx_buffer(uint8_t *is_valid_tx_buf, void (**free_func)(void* ptr));
 
-#if H_HOST_USES_STATIC_NETIF
-/* Netif creation is now handled by the example code */
-esp_netif_t *s_netif_sta = NULL;
-
-esp_netif_t * create_sta_netif_with_static_ip(void)
-{
-	ESP_LOGI(TAG, "Create netif with static IP");
-	/* Create "almost" default station, but with un-flagged DHCP client */
-	esp_netif_inherent_config_t netif_cfg;
-	memcpy(&netif_cfg, ESP_NETIF_BASE_DEFAULT_WIFI_STA, sizeof(netif_cfg));
-	netif_cfg.flags &= ~ESP_NETIF_DHCP_CLIENT;
-	esp_netif_config_t cfg_sta = {
-		.base = &netif_cfg,
-		.stack = ESP_NETIF_NETSTACK_DEFAULT_WIFI_STA,
-	};
-	esp_netif_t *sta_netif = esp_netif_new(&cfg_sta);
-	assert(sta_netif);
-
-	ESP_LOGI(TAG, "Creating slave sta netif with static IP");
-
-	ESP_ERROR_CHECK(esp_netif_attach_wifi_station(sta_netif));
-	ESP_ERROR_CHECK(esp_wifi_set_default_wifi_sta_handlers());
-
-	/* stop dhcpc */
-	ESP_ERROR_CHECK(esp_netif_dhcpc_stop(sta_netif));
-
-	return sta_netif;
-}
-
-static esp_err_t create_static_netif(void)
-{
-	/* Only initialize networking stack if not already initialized */
-	if (!s_netif_sta) {
-		esp_netif_init();
-		esp_event_loop_create_default();
-		s_netif_sta = create_sta_netif_with_static_ip();
-		assert(s_netif_sta);
-	}
-	return ESP_OK;
-}
-#endif
 
 static inline void spi_mempool_create(void)
 {
@@ -272,6 +224,7 @@ void *bus_init_internal(void)
 	/* Creates & Give sem for next spi trans */
 	spi_trans_ready_sem = g_h.funcs->_h_create_semaphore(1);
 	assert(spi_trans_ready_sem);
+	g_h.funcs->_h_get_semaphore(spi_trans_ready_sem, 0);
 
 	spi_handle = g_h.funcs->_h_bus_init();
 	if (!spi_handle) {
@@ -326,7 +279,7 @@ static int process_spi_rx_buf(uint8_t * rxbuff)
 
 	if (is_wakeup_pkt && len<1500) {
 		ESP_LOGW(TAG, "Host wakeup triggered, if_type: %u, len: %u ", h->if_type, len);
-		//ESP_HEXLOGW("Wakeup_pkt", rxbuff+offset, len, min(len, 128));
+		//ESP_HEXLOGW("Wakeup_pkt", rxbuff+offset, len, H_MIN(len, 128));
 	}
 
 	if (ESP_MAX_IF == h->if_type)
@@ -515,38 +468,42 @@ static int check_and_execute_spi_transaction(void)
   * @brief  Send to slave via SPI
   * @param  iface_type -type of interface
   *         iface_num - interface number
-  *         wbuffer - tx buffer
-  *         wlen - size of wbuffer
-  * @retval sendbuf - Tx buffer
+  *         payload_buf - tx buffer
+  *         payload_len - size of tx buffer
+  *         buffer_to_free - buffer to be freed after tx
+  *         free_buf_func - function used to free buffer_to_free
+  *         flags - flags to set
+  * @retval int - STM_PASS or STM_FAIL
   */
 int esp_hosted_tx(uint8_t iface_type, uint8_t iface_num,
-		uint8_t * wbuffer, uint16_t wlen, uint8_t buff_zcopy,
-		void (*free_wbuf_fun)(void* ptr), uint8_t flag)
+		uint8_t *payload_buf, uint16_t payload_len, uint8_t buff_zcopy,
+		uint8_t *buffer_to_free, void (*free_buf_func)(void *ptr), uint8_t flags)
 {
 	interface_buffer_handle_t buf_handle = {0};
 	void (*free_func)(void* ptr) = NULL;
 	uint8_t pkt_prio = PRIO_Q_OTHERS;
 
-	if (free_wbuf_fun)
-		free_func = free_wbuf_fun;
+	if (free_buf_func)
+		free_func = free_buf_func;
 
-	if ((!flag) && (!wbuffer || !wlen || (wlen > MAX_PAYLOAD_SIZE))) {
+	if ((flags == 0 || flags == MORE_FRAGMENT) &&
+	     (!payload_buf || !payload_len || (payload_len > MAX_PAYLOAD_SIZE))) {
 		ESP_LOGE(TAG, "write fail: buff(%p) 0? OR (0<len(%u)<=max_poss_len(%u))?",
-				wbuffer, wlen, MAX_PAYLOAD_SIZE);
-		H_FREE_PTR_WITH_FUNC(free_func, wbuffer);
+				 payload_buf, payload_len, MAX_PAYLOAD_SIZE);
+		H_FREE_PTR_WITH_FUNC(free_func, buffer_to_free);
 		return -1;
 	}
 	//g_h.funcs->_h_memset(&buf_handle, 0, sizeof(buf_handle));
 	buf_handle.payload_zcopy = buff_zcopy;
 	buf_handle.if_type = iface_type;
 	buf_handle.if_num = iface_num;
-	buf_handle.payload_len = wlen;
-	buf_handle.payload = wbuffer;
-	buf_handle.priv_buffer_handle = wbuffer;
+	buf_handle.payload_len = payload_len;
+	buf_handle.payload = payload_buf;
+	buf_handle.priv_buffer_handle = buffer_to_free;
 	buf_handle.free_buf_handle = free_func;
-	buf_handle.flag = flag;
+	buf_handle.flag = flags;
 
-	ESP_LOGV(TAG, "ifype: %u wbuff:%p, free: %p wlen:%u flag:%u", iface_type, wbuffer, free_func, wlen, flag);
+	ESP_LOGV(TAG, "ifype: %u wbuff:%p, free: %p wlen:%u flag:%u", iface_type, payload_buf, free_func, payload_len, flags);
 
 	if (buf_handle.if_type == ESP_SERIAL_IF)
 		pkt_prio = PRIO_Q_SERIAL;
@@ -579,9 +536,6 @@ int esp_hosted_tx(uint8_t iface_type, uint8_t iface_num,
 static void spi_transaction_task(void const* pvParameters)
 {
 	/* Netif creation is now handled by the example code */
-#if H_HOST_USES_STATIC_NETIF
-	create_static_netif();
-#endif
 
 	ESP_LOGI(TAG, "Staring SPI task");
 
@@ -686,7 +640,7 @@ static void spi_process_rx_task(void const* pvParameters)
 				/* User can re-use this type of transaction */
 			}
 		} else if (buf_handle->if_type == ESP_HCI_IF) {
-			hci_rx_handler(buf_handle);
+			hci_rx_handler(buf_handle->payload, buf_handle->payload_len);
 		} else if (buf_handle->if_type == ESP_TEST_IF) {
 #if TEST_RAW_TP
 			update_test_raw_tp_rx_len(buf_handle->payload_len+H_ESP_PAYLOAD_HEADER_OFFSET);
@@ -792,7 +746,7 @@ static uint8_t * get_next_tx_buffer(uint8_t *is_valid_tx_buf, void (**free_func)
 		payload_header->offset  = htole16(sizeof(struct esp_payload_header));
 		payload_header->if_type = buf_handle.if_type;
 		payload_header->if_num  = buf_handle.if_num;
-		payload_header->flags    = buf_handle.flag;
+		payload_header->flags   = buf_handle.flag;
 
 		if (payload_header->if_type == ESP_HCI_IF) {
 			// special handling for HCI
@@ -807,7 +761,7 @@ static uint8_t * get_next_tx_buffer(uint8_t *is_valid_tx_buf, void (**free_func)
 		} else {
 			/* Non HCI packets */
 			if (!buf_handle.payload_zcopy && len)
-				g_h.funcs->_h_memcpy(payload, buf_handle.payload, min(len, MAX_PAYLOAD_SIZE));
+				g_h.funcs->_h_memcpy(payload, buf_handle.payload, H_MIN(len, MAX_PAYLOAD_SIZE));
 		}
 
 		//TODO: checksum should be configurable from menuconfig
@@ -857,18 +811,22 @@ static esp_err_t transport_gpio_reset(void *bus_handle, gpio_pin_t reset_pin)
 	ESP_LOGI(TAG, "Resetting slave on SPI bus with pin %d", reset_pin.pin);
 	g_h.funcs->_h_config_gpio(reset_pin.port, reset_pin.pin, H_GPIO_MODE_DEF_OUTPUT);
 	g_h.funcs->_h_write_gpio(reset_pin.port, reset_pin.pin, H_RESET_VAL_ACTIVE);
-	g_h.funcs->_h_msleep(1);
+	g_h.funcs->_h_msleep(10);
 	g_h.funcs->_h_write_gpio(reset_pin.port, reset_pin.pin, H_RESET_VAL_INACTIVE);
-	g_h.funcs->_h_msleep(1);
+	g_h.funcs->_h_msleep(10);
 	g_h.funcs->_h_write_gpio(reset_pin.port, reset_pin.pin, H_RESET_VAL_ACTIVE);
-	//g_h.funcs->_h_msleep(1500);
+	/* Delay for a short while to allow co-processor to take control
+	 * of GPIO signals after reset. Otherwise, we may false detect on
+	 * the GPIOs going high during the reset.
+	 */
+	g_h.funcs->_h_msleep(500);
 	return ESP_OK;
 }
 
 int ensure_slave_bus_ready(void *bus_handle)
 {
 	esp_err_t res = ESP_OK;
-	gpio_pin_t reset_pin = { .port = H_GPIO_PIN_RESET_Port, .pin = H_GPIO_PIN_RESET_Pin };
+	gpio_pin_t reset_pin = { .port = H_GPIO_PORT_RESET, .pin = H_GPIO_PIN_RESET };
 
 	if (ESP_TRANSPORT_OK != esp_hosted_transport_get_reset_config(&reset_pin)) {
 		ESP_LOGE(TAG, "Unable to get RESET config for transport");
@@ -941,7 +899,7 @@ int bus_inform_slave_host_power_save_start(void)
 	} else {
 		/* Use normal queue mechanism */
 		ret = esp_hosted_tx(ESP_SERIAL_IF, 0, NULL, 0,
-			H_BUFF_NO_ZEROCOPY, NULL, FLAG_POWER_SAVE_STARTED);
+			H_BUFF_NO_ZEROCOPY, NULL, NULL, FLAG_POWER_SAVE_STARTED);
 	}
 
 	return ret;
@@ -999,7 +957,7 @@ int bus_inform_slave_host_power_save_stop(void)
 	} else {
 		/* Use normal queue mechanism */
 		ret = esp_hosted_tx(ESP_SERIAL_IF, 0, NULL, 0,
-			H_BUFF_NO_ZEROCOPY, NULL, FLAG_POWER_SAVE_STOPPED);
+			H_BUFF_NO_ZEROCOPY, NULL, NULL, FLAG_POWER_SAVE_STOPPED);
 	}
 
 	return ret;

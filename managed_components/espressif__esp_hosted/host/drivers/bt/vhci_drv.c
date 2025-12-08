@@ -1,13 +1,29 @@
-// Copyright 2015-2024 Espressif Systems (Shanghai) PTE LTD
-/* SPDX-License-Identifier: GPL-2.0 OR Apache-2.0 */
+/*
+ * SPDX-FileCopyrightText: 2024-2025 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
 #include <stdint.h>
+#include <stddef.h>
+#include <stdbool.h>
 
 #include "esp_hosted_transport.h"
-#include "os_wrapper.h"
+#include "esp_hosted_os_abstraction.h"
 #include "transport_drv.h"
-
+#include "port_esp_hosted_host_os.h"
 #include "hci_drv.h"
+
+#ifndef __WEAK__
+#  if defined(__GNUC__) || defined(__clang__)
+#    define __WEAK__ __attribute__((weak))
+#  elif defined(_MSC_VER)
+#    define __WEAK__ __declspec(selectany)
+#  else
+#    define __WEAK__
+#  endif
+#endif
+
 
 #if H_BT_HOST_ESP_NIMBLE
 #include "host/ble_hs_mbuf.h"
@@ -17,8 +33,10 @@
 #include "nimble/hci_common.h"
 #endif
 
-#if H_BT_HOST_ESP_BLUEDROID
 #include "esp_hosted_bt.h"
+
+#if H_BT_HOST_ESP_BLUEDROID
+#include "esp_hosted_bluedroid.h"
 #endif
 
 #include "esp_hosted_log.h"
@@ -44,10 +62,10 @@ void hci_drv_show_configuration(void)
 /**
  * HCI_H4_xxx is the first byte of the received data
  */
-__WEAK__ int hci_rx_handler(interface_buffer_handle_t *buf_handle)
+H_WEAK_REF int hci_rx_handler(uint8_t *buf, size_t buf_len)
 {
-	uint8_t * data = buf_handle->payload;
-	uint32_t len_total_read = buf_handle->payload_len;
+	uint8_t * data = buf;
+	uint32_t len_total_read = buf_len;
 
 	int rc;
 
@@ -152,7 +170,7 @@ int ble_transport_to_ll_acl_impl(struct os_mbuf *om)
 	uint8_t * data = NULL;
 	int res;
 
-	data = MEM_ALLOC(data_len);
+	data = g_h.funcs->_h_malloc_align(data_len, HOSTED_MEM_ALIGNMENT_64);
 	if (!data) {
 		ESP_LOGE(TAG, "Tx %s: malloc failed", __func__);
 		res = ESP_FAIL;
@@ -163,11 +181,13 @@ int ble_transport_to_ll_acl_impl(struct os_mbuf *om)
 	res = ble_hs_mbuf_to_flat(om, &data[1], OS_MBUF_PKTLEN(om), NULL);
 	if (res) {
 		ESP_LOGE(TAG, "Tx: Error copying HCI_H4_ACL data %d", res);
+        os_mbuf_free_chain(om);
+		g_h.funcs->_h_free_align(data);
 		res = ESP_FAIL;
 		goto exit;
 	}
 
-	res = esp_hosted_tx(ESP_HCI_IF, 0, data, data_len, H_BUFF_NO_ZEROCOPY, H_DEFLT_FREE_FUNC, 0);
+	res = esp_hosted_tx(ESP_HCI_IF, 0, data, data_len, H_BUFF_NO_ZEROCOPY, data, H_DEFLT_FREE_FUNC, 0);
 
  exit:
 	os_mbuf_free_chain(om);
@@ -185,7 +205,7 @@ int ble_transport_to_ll_cmd_impl(void *buf)
 	uint8_t * data = NULL;
 	int res;
 
-	data = MEM_ALLOC(buf_len);
+	data = g_h.funcs->_h_malloc_align(buf_len, HOSTED_MEM_ALIGNMENT_64);
 	if (!data) {
 		ESP_LOGE(TAG, "Tx %s: malloc failed", __func__);
 		res =  ESP_FAIL;
@@ -195,7 +215,7 @@ int ble_transport_to_ll_cmd_impl(void *buf)
 	data[0] = HCI_H4_CMD;
 	memcpy(&data[1], buf, buf_len - 1);
 
-	res = esp_hosted_tx(ESP_HCI_IF, 0, data, buf_len, H_BUFF_NO_ZEROCOPY, H_DEFLT_FREE_FUNC, 0);
+	res = esp_hosted_tx(ESP_HCI_IF, 0, data, buf_len, H_BUFF_NO_ZEROCOPY, data, H_DEFLT_FREE_FUNC, 0);
 
  exit:
 	ble_transport_free(buf);
@@ -207,10 +227,10 @@ int ble_transport_to_ll_cmd_impl(void *buf)
 #if H_BT_HOST_ESP_BLUEDROID
 static esp_bluedroid_hci_driver_callbacks_t s_callback = { 0 };
 
-__WEAK__ int hci_rx_handler(interface_buffer_handle_t *buf_handle)
+H_WEAK_REF int hci_rx_handler(uint8_t *buf, size_t buf_len)
 {
-	uint8_t * data = buf_handle->payload;
-	uint32_t len_total_read = buf_handle->payload_len;
+	uint8_t * data = buf;
+	uint32_t len_total_read = buf_len;
 
 	if (s_callback.notify_host_recv) {
 		s_callback.notify_host_recv(data, len_total_read);
@@ -241,14 +261,14 @@ void hosted_hci_bluedroid_send(uint8_t *data, uint16_t len)
 	int res;
 	uint8_t * ptr = NULL;
 
-	ptr = MEM_ALLOC(len);
+	ptr = g_h.funcs->_h_malloc_align(len, HOSTED_MEM_ALIGNMENT_64);
 	if (!ptr) {
 		ESP_LOGE(TAG, "%s: malloc failed", __func__);
 		return;
 	}
 	memcpy(ptr, data, len);
 
-	res = esp_hosted_tx(ESP_HCI_IF, 0, ptr, len, H_BUFF_NO_ZEROCOPY, H_DEFLT_FREE_FUNC, 0);
+	res = esp_hosted_tx(ESP_HCI_IF, 0, ptr, len, H_BUFF_NO_ZEROCOPY, ptr, H_DEFLT_FREE_FUNC, 0);
 
 	if (res) {
 		ESP_LOGE(TAG, "%s: Tx failed", __func__);

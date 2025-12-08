@@ -12,7 +12,7 @@
 #include "esp_console.h"
 
 #ifdef CONFIG_ESP_HOSTED_ENABLED
-#include "esp_hosted_config.h"
+#include "port_esp_hosted_host_config.h"
 #include "esp_hosted_power_save.h"
 #endif
 
@@ -395,7 +395,7 @@ int esp_cli_register_cmds(void)
 
 	app_register_all_wifi_commands();
 	app_register_iperf_commands();
-	app_register_ping_commands();
+	ping_cmd_register_ping();
 	app_register_iperf_hook_func(iperf_hook_show_wifi_stats);
 #endif
 	return 0;

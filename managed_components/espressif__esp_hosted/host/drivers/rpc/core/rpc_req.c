@@ -1,13 +1,18 @@
-// Copyright 2015-2022 Espressif Systems (Shanghai) PTE LTD
-/* SPDX-License-Identifier: GPL-2.0 OR Apache-2.0 */
+/*
+ * SPDX-FileCopyrightText: 2015-2025 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
 #include "rpc_core.h"
 #include "rpc_slave_if.h"
 #include "esp_hosted_rpc.h"
-#include "esp_log.h"
-#include "esp_hosted_wifi_config.h"
+#include "port_esp_hosted_host_wifi_config.h"
 #include "esp_hosted_transport.h"
 #include "esp_hosted_bitmasks.h"
+#include "esp_idf_version.h"
+#include "port_esp_hosted_host_log.h"
+#include "esp_hosted_os_abstraction.h"
 
 DEFINE_LOG_TAG(rpc_req);
 
@@ -65,6 +70,7 @@ int compose_rpc_req(Rpc *req, ctrl_cmd_t *app_req, int32_t *failure_status)
 	case RPC_ID__Req_WifiGetPs:
 	case RPC_ID__Req_OTABegin:
 	case RPC_ID__Req_OTAEnd:
+	case RPC_ID__Req_OTAActivate:
 	case RPC_ID__Req_WifiDeinit:
 	case RPC_ID__Req_WifiStart:
 	case RPC_ID__Req_WifiStop:
@@ -86,6 +92,22 @@ int compose_rpc_req(Rpc *req, ctrl_cmd_t *app_req, int32_t *failure_status)
 	case RPC_ID__Req_WifiStaGetAid:
 	case RPC_ID__Req_WifiGetBand:
 	case RPC_ID__Req_WifiGetBandMode:
+	case RPC_ID__Req_AppGetDesc:
+#if H_WIFI_ENTERPRISE_SUPPORT
+	case RPC_ID__Req_WifiStaEnterpriseEnable:
+	case RPC_ID__Req_WifiStaEnterpriseDisable:
+	case RPC_ID__Req_EapClearIdentity:
+	case RPC_ID__Req_EapClearUsername:
+	case RPC_ID__Req_EapClearPassword:
+	case RPC_ID__Req_EapClearNewPassword:
+	case RPC_ID__Req_EapClearCaCert:
+	case RPC_ID__Req_EapClearCertificateAndKey:
+#endif
+#if H_DPP_SUPPORT
+	case RPC_ID__Req_SuppDppDeinit:
+	case RPC_ID__Req_SuppDppStartListen:
+	case RPC_ID__Req_SuppDppStopListen:
+#endif
 	case RPC_ID__Req_WifiScanGetApRecord: {
 		/* Intentional fallthrough & empty */
 		break;
@@ -472,6 +494,93 @@ int compose_rpc_req(Rpc *req, ctrl_cmd_t *app_req, int32_t *failure_status)
 		RPC_ALLOC_ASSIGN(RpcReqGetCoprocessorFwVersion, req_get_coprocessor_fwversion,
 				rpc__req__get_coprocessor_fw_version__init);
 		break;
+	} case RPC_ID__Req_WifiSetInactiveTime: {
+		RPC_ALLOC_ASSIGN(RpcReqWifiSetInactiveTime, req_wifi_set_inactive_time,
+				rpc__req__wifi_set_inactive_time__init);
+		req_payload->ifx = app_req->u.wifi_inactive_time.ifx;
+		req_payload->sec = app_req->u.wifi_inactive_time.sec;
+		break;
+	} case RPC_ID__Req_WifiGetInactiveTime: {
+		RPC_ALLOC_ASSIGN(RpcReqWifiGetInactiveTime, req_wifi_get_inactive_time,
+				rpc__req__wifi_get_inactive_time__init);
+		req_payload->ifx = app_req->u.wifi_inactive_time.ifx;
+		break;
+#if H_WIFI_HE_SUPPORT
+	} case RPC_ID__Req_WifiStaTwtConfig: {
+		RPC_ALLOC_ASSIGN(RpcReqWifiStaTwtConfig, req_wifi_sta_twt_config,
+				rpc__req__wifi_sta_twt_config__init);
+		RPC_ALLOC_ELEMENT(WifiTwtConfig, req_payload->config, wifi_twt_config__init);
+		req_payload->config->post_wakeup_event = app_req->u.wifi_twt_config.post_wakeup_event;
+#if H_GOT_TWT_ENABLE_KEEP_ALIVE
+		req_payload->config->twt_enable_keep_alive = app_req->u.wifi_twt_config.twt_enable_keep_alive;
+#endif
+		break;
+	} case RPC_ID__Req_WifiStaItwtSetup: {
+		RPC_ALLOC_ASSIGN(RpcReqWifiStaItwtSetup, req_wifi_sta_itwt_setup,
+				rpc__req__wifi_sta_itwt_setup__init);
+		RPC_ALLOC_ELEMENT(WifiItwtSetupConfig, req_payload->setup_config, wifi_itwt_setup_config__init);
+#if H_WIFI_HE_GREATER_THAN_ESP_IDF_5_3
+		wifi_itwt_setup_config_t * p_a_cfg = &app_req->u.wifi_itwt_setup_config;
+#else
+		wifi_twt_setup_config_t * p_a_cfg = &app_req->u.wifi_twt_setup_config;
+#endif
+		WifiItwtSetupConfig * p_c_cfg = req_payload->setup_config;
+
+		p_c_cfg->setup_cmd = p_a_cfg->setup_cmd;
+		if (p_a_cfg->trigger)
+			H_SET_BIT(WIFI_ITWT_CONFIG_1_trigger_BIT, p_c_cfg->bitmask_1);
+
+		if (p_a_cfg->flow_type)
+			H_SET_BIT(WIFI_ITWT_CONFIG_1_flow_type_BIT, p_c_cfg->bitmask_1);
+
+		// WIFI_ITWT_CONFIG_1_flow_id_BIT is three bits wide
+		if (p_a_cfg->flow_id)
+			p_c_cfg->bitmask_1 |= ((p_a_cfg->flow_id & 0x07) << WIFI_ITWT_CONFIG_1_flow_id_BIT);
+
+		// WIFI_ITWT_CONFIG_1_wake_invl_expn_BIT is five bits wide
+		if (p_a_cfg->wake_invl_expn)
+			p_c_cfg->bitmask_1 |= ((p_a_cfg->wake_invl_expn & 0x1F) << WIFI_ITWT_CONFIG_1_wake_invl_expn_BIT);
+
+		if (p_a_cfg->wake_duration_unit)
+			H_SET_BIT(WIFI_ITWT_CONFIG_1_wake_duration_unit_BIT, p_c_cfg->bitmask_1);
+
+#if H_DECODE_WIFI_RESERVED_FIELD
+		WIFI_ITWT_CONFIG_1_SET_RESERVED_VAL(p_a_cfg->reserved, p_c_cfg->bitmask_1);
+#endif
+		p_c_cfg->min_wake_dura = p_a_cfg->min_wake_dura;
+		p_c_cfg->wake_invl_mant = p_a_cfg->wake_invl_mant;
+		p_c_cfg->twt_id = p_a_cfg->twt_id;
+		p_c_cfg->timeout_time_ms = p_a_cfg->timeout_time_ms;
+
+		break;
+	} case RPC_ID__Req_WifiStaItwtTeardown: {
+		RPC_ALLOC_ASSIGN(RpcReqWifiStaItwtTeardown, req_wifi_sta_itwt_teardown,
+				rpc__req__wifi_sta_itwt_teardown__init);
+
+		req_payload->flow_id = app_req->u.wifi_itwt_flow_id;
+		break;
+	} case RPC_ID__Req_WifiStaItwtSuspend: {
+		RPC_ALLOC_ASSIGN(RpcReqWifiStaItwtSuspend, req_wifi_sta_itwt_suspend,
+				rpc__req__wifi_sta_itwt_suspend__init);
+
+		req_payload->flow_id = app_req->u.wifi_itwt_suspend.flow_id;
+		req_payload->suspend_time_ms = app_req->u.wifi_itwt_suspend.suspend_time_ms;
+		break;
+	} case RPC_ID__Req_WifiStaItwtGetFlowIdStatus: {
+		RPC_ALLOC_ASSIGN(RpcReqWifiStaItwtGetFlowIdStatus, req_wifi_sta_itwt_get_flow_id_status,
+				rpc__req__wifi_sta_itwt_get_flow_id_status__init);
+		break;
+	} case RPC_ID__Req_WifiStaItwtSendProbeReq: {
+		RPC_ALLOC_ASSIGN(RpcReqWifiStaItwtSendProbeReq, req_wifi_sta_itwt_send_probe_req,
+				rpc__req__wifi_sta_itwt_send_probe_req__init);
+		req_payload->timeout_ms = app_req->u.wifi_itwt_probe_req_timeout_ms;
+		break;
+	} case RPC_ID__Req_WifiStaItwtSetTargetWakeTimeOffset: {
+		RPC_ALLOC_ASSIGN(RpcReqWifiStaItwtSetTargetWakeTimeOffset, req_wifi_sta_itwt_set_target_wake_time_offset,
+				rpc__req__wifi_sta_itwt_set_target_wake_time_offset__init);
+		req_payload->offset_us = app_req->u.wifi_itwt_set_target_wake_time_offset_us;
+		break;
+#endif // H_WIFI_HE_SUPPORT
 #if H_WIFI_DUALBAND_SUPPORT
 	} case RPC_ID__Req_WifiSetProtocols: {
 		RPC_ALLOC_ASSIGN(RpcReqWifiSetProtocols, req_wifi_set_protocols,
@@ -511,7 +620,60 @@ int compose_rpc_req(Rpc *req, ctrl_cmd_t *app_req, int32_t *failure_status)
 				rpc__req__wifi_set_band_mode__init);
 		req_payload->bandmode = app_req->u.wifi_band_mode;
 		break;
-#endif
+#endif // H_WIFI_DUALBAND_SUPPORT
+	} case RPC_ID__Req_IfaceMacAddrSetGet: {
+		RPC_ALLOC_ASSIGN(RpcReqIfaceMacAddrSetGet, req_iface_mac_addr_set_get,
+				rpc__req__iface_mac_addr_set_get__init);
+		req_payload->set = app_req->u.iface_mac.set;
+		req_payload->type = app_req->u.iface_mac.type;
+		if (req_payload->set) {
+			RPC_REQ_COPY_BYTES(req_payload->mac, app_req->u.iface_mac.mac,
+					app_req->u.iface_mac.mac_len);
+		}
+		break;
+	} case RPC_ID__Req_FeatureControl: {
+		RPC_ALLOC_ASSIGN(RpcReqFeatureControl, req_feature_control,
+				rpc__req__feature_control__init);
+		// convert from rpc_slave_if.h enums to proto enums
+		switch (app_req->u.feature_control.feature) {
+		case FEATURE_BT:
+			req_payload->feature = RPC_FEATURE__Feature_Bluetooth;
+			break;
+		default:
+			req_payload->feature = RPC_FEATURE__Feature_None;
+			break;
+		}
+		switch (app_req->u.feature_control.command) {
+		case FEATURE_COMMAND_BT_INIT:
+			req_payload->command = RPC_FEATURE_COMMAND__Feature_Command_BT_Init;
+			break;
+		case FEATURE_COMMAND_BT_DEINIT:
+			req_payload->command = RPC_FEATURE_COMMAND__Feature_Command_BT_Deinit;
+			break;
+		case FEATURE_COMMAND_BT_ENABLE:
+			req_payload->command = RPC_FEATURE_COMMAND__Feature_Command_BT_Enable;
+			break;
+		case FEATURE_COMMAND_BT_DISABLE:
+			req_payload->command = RPC_FEATURE_COMMAND__Feature_Command_BT_Disable;
+			break;
+		default:
+			req_payload->command = RPC_FEATURE_COMMAND__Feature_Command_None;
+			break;
+		}
+		switch (app_req->u.feature_control.option) {
+		case FEATURE_OPTION_BT_DEINIT_RELEASE_MEMORY:
+			req_payload->option = RPC_FEATURE_OPTION__Feature_Option_BT_Deinit_Release_Memory;
+			break;
+		default:
+			req_payload->option = RPC_FEATURE_OPTION__Feature_Option_None;
+			break;
+		}
+		break;
+	} case RPC_ID__Req_IfaceMacAddrLenGet: {
+		RPC_ALLOC_ASSIGN(RpcReqIfaceMacAddrLenGet, req_iface_mac_addr_len_get,
+				rpc__req__iface_mac_addr_len_get__init);
+		req_payload->type = app_req->u.iface_mac_len.type;
+		break;
 	} case RPC_ID__Req_SetDhcpDnsStatus: {
 		RPC_ALLOC_ASSIGN(RpcReqSetDhcpDnsStatus, req_set_dhcp_dns,
 				rpc__req__set_dhcp_dns_status__init);
@@ -529,6 +691,135 @@ int compose_rpc_req(Rpc *req, ctrl_cmd_t *app_req, int32_t *failure_status)
 		RPC_REQ_COPY_STR(p_c->dhcp_gw, p_a->dhcp_gw, 64);
 		RPC_REQ_COPY_STR(p_c->dns_ip, p_a->dns_ip, 64);
 		break;
+#if H_WIFI_ENTERPRISE_SUPPORT
+	} case RPC_ID__Req_EapSetIdentity: {
+		RPC_ALLOC_ASSIGN(RpcReqEapSetIdentity, req_eap_set_identity,
+				rpc__req__eap_set_identity__init);
+		RPC_REQ_COPY_BYTES(req_payload->identity, (uint8_t *)app_req->u.eap_identity.identity, app_req->u.eap_identity.len);
+		req_payload->len = app_req->u.eap_identity.len;
+		break;
+	} case RPC_ID__Req_EapSetUsername: {
+		RPC_ALLOC_ASSIGN(RpcReqEapSetUsername, req_eap_set_username,
+				rpc__req__eap_set_username__init);
+		RPC_REQ_COPY_BYTES(req_payload->username, (uint8_t *)app_req->u.eap_username.username, app_req->u.eap_username.len);
+		req_payload->len = app_req->u.eap_username.len;
+		break;
+	} case RPC_ID__Req_EapSetPassword: {
+		RPC_ALLOC_ASSIGN(RpcReqEapSetPassword, req_eap_set_password,
+				rpc__req__eap_set_password__init);
+		RPC_REQ_COPY_BYTES(req_payload->password, (uint8_t *)app_req->u.eap_password.password, app_req->u.eap_password.len);
+		req_payload->len = app_req->u.eap_password.len;
+		break;
+	} case RPC_ID__Req_EapSetNewPassword: {
+		RPC_ALLOC_ASSIGN(RpcReqEapSetNewPassword, req_eap_set_new_password,
+				rpc__req__eap_set_new_password__init);
+		RPC_REQ_COPY_BYTES(req_payload->new_password, (uint8_t *)app_req->u.eap_password.password, app_req->u.eap_password.len);
+		req_payload->len = app_req->u.eap_password.len;
+		break;
+	} case RPC_ID__Req_EapSetCaCert: {
+		RPC_ALLOC_ASSIGN(RpcReqEapSetCaCert, req_eap_set_ca_cert,
+				rpc__req__eap_set_ca_cert__init);
+		RPC_REQ_COPY_BYTES(req_payload->ca_cert, (uint8_t *)app_req->u.eap_ca_cert.ca_cert, app_req->u.eap_ca_cert.len);
+		req_payload->ca_cert_len = app_req->u.eap_ca_cert.len;
+		break;
+	} case RPC_ID__Req_EapSetCertificateAndKey: {
+		RPC_ALLOC_ASSIGN(RpcReqEapSetCertificateAndKey, req_eap_set_certificate_and_key,
+				rpc__req__eap_set_certificate_and_key__init);
+		RPC_REQ_COPY_BYTES(req_payload->client_cert, (uint8_t *)app_req->u.eap_cert_key.client_cert, app_req->u.eap_cert_key.client_cert_len);
+		req_payload->client_cert_len = app_req->u.eap_cert_key.client_cert_len;
+		RPC_REQ_COPY_BYTES(req_payload->private_key, (uint8_t *)app_req->u.eap_cert_key.private_key, app_req->u.eap_cert_key.private_key_len);
+		req_payload->private_key_len = app_req->u.eap_cert_key.private_key_len;
+		RPC_REQ_COPY_BYTES(req_payload->private_key_password, (uint8_t *)app_req->u.eap_cert_key.private_key_password, app_req->u.eap_cert_key.private_key_passwd_len);
+		req_payload->private_key_passwd_len = app_req->u.eap_cert_key.private_key_passwd_len;
+		break;
+	} case RPC_ID__Req_EapSetDisableTimeCheck: {
+		RPC_ALLOC_ASSIGN(RpcReqEapSetDisableTimeCheck, req_eap_set_disable_time_check,
+				rpc__req__eap_set_disable_time_check__init);
+		req_payload->disable = app_req->u.eap_disable_time_check.disable;
+		break;
+	} case RPC_ID__Req_EapSetTtlsPhase2Method: {
+		RPC_ALLOC_ASSIGN(RpcReqEapSetTtlsPhase2Method, req_eap_set_ttls_phase2_method,
+				rpc__req__eap_set_ttls_phase2_method__init);
+		req_payload->type = app_req->u.eap_ttls_phase2;
+		break;
+	} case RPC_ID__Req_EapSetSuitebCertification: {
+		RPC_ALLOC_ASSIGN(RpcReqEapSetSuiteb192bitCertification, req_eap_set_suiteb_certification,
+				rpc__req__eap_set_suiteb192bit_certification__init);
+		req_payload->enable = app_req->u.eap_suiteb_192bit.enable;
+		break;
+	} case RPC_ID__Req_EapSetPacFile: {
+		RPC_ALLOC_ASSIGN(RpcReqEapSetPacFile, req_eap_set_pac_file,
+				rpc__req__eap_set_pac_file__init);
+		RPC_REQ_COPY_BYTES(req_payload->pac_file, (uint8_t *)app_req->u.eap_pac_file.pac_file, app_req->u.eap_pac_file.len);
+		req_payload->pac_file_len = app_req->u.eap_pac_file.len;
+		break;
+	} case RPC_ID__Req_EapSetFastParams: {
+		RPC_ALLOC_ASSIGN(RpcReqEapSetFastParams, req_eap_set_fast_params,
+				rpc__req__eap_set_fast_params__init);
+		RPC_ALLOC_ELEMENT(EapFastConfig, req_payload->eap_fast_config, eap_fast_config__init);
+		req_payload->eap_fast_config->fast_provisioning = app_req->u.eap_fast_config.fast_provisioning;
+		req_payload->eap_fast_config->fast_max_pac_list_len = app_req->u.eap_fast_config.fast_max_pac_list_len;
+		req_payload->eap_fast_config->fast_pac_format_binary = app_req->u.eap_fast_config.fast_pac_format_binary;
+		break;
+	} case RPC_ID__Req_EapUseDefaultCertBundle: {
+		RPC_ALLOC_ASSIGN(RpcReqEapUseDefaultCertBundle, req_eap_use_default_cert_bundle,
+				rpc__req__eap_use_default_cert_bundle__init);
+		req_payload->use_default_bundle = app_req->u.eap_default_cert_bundle.use_default;
+		break;
+#if H_GOT_EAP_OKC_SUPPORT
+	} case RPC_ID__Req_WifiSetOkcSupport: {
+		RPC_ALLOC_ASSIGN(RpcReqWifiSetOkcSupport, req_wifi_set_okc_support,
+				rpc__req__wifi_set_okc_support__init);
+		req_payload->enable = app_req->u.wifi_okc_support.enable;
+		break;
+#endif
+#if H_GOT_EAP_SET_DOMAIN_NAME
+	} case RPC_ID__Req_EapSetDomainName: {
+		RPC_ALLOC_ASSIGN(RpcReqEapSetDomainName, req_eap_set_domain_name,
+				rpc__req__eap_set_domain_name__init);
+
+		RPC_REQ_COPY_BYTES(req_payload->domain_name, (uint8_t *)app_req->u.eap_domain_name.domain_name, strlen(app_req->u.eap_domain_name.domain_name) + 1);
+		break;
+#endif
+#if H_GOT_SET_EAP_METHODS_API
+	} case RPC_ID__Req_EapSetEapMethods: {
+		RPC_ALLOC_ASSIGN(RpcReqEapSetEapMethods, req_eap_set_eap_methods,
+				rpc__req__eap_set_eap_methods__init);
+		req_payload->methods = app_req->u.methods;
+		break;
+#endif
+#endif
+#if H_DPP_SUPPORT
+	} case RPC_ID__Req_SuppDppInit: {
+		RPC_ALLOC_ASSIGN(RpcReqSuppDppInit,req_supp_dpp_init,
+				rpc__req__supp_dpp_init__init);
+		req_payload->cb = app_req->u.dpp_enable_cb;
+		break;
+	} case RPC_ID__Req_SuppDppBootstrapGen: {
+		RPC_ALLOC_ASSIGN(RpcReqSuppDppBootstrapGen,req_supp_dpp_bootstrap_gen,
+				rpc__req__supp_dpp_bootstrap_gen__init);
+		int str_len;
+		RpcReqSuppDppBootstrapGen *p_c = req_payload;
+		rpc_supp_dpp_bootstrap_gen_t* p_a = &app_req->u.dpp_bootstrap_gen;
+
+		p_c->type = p_a->type;
+
+		// chan_list: copy terminating NULL
+		str_len = strlen(p_a->chan_list);
+		RPC_REQ_COPY_BYTES(p_c->chan_list, (uint8_t *)p_a->chan_list, str_len + 1);
+
+		// key is a fixed length (if provided)
+		if (p_a->key) {
+			RPC_REQ_COPY_BYTES(p_c->key, (uint8_t *)p_a->key, DPP_BOOTSTRAP_GEN_KEY_LEN);
+		}
+
+		// info: copy terminating NULL
+		if (p_a->info) {
+			str_len = strlen(p_a->info);
+			RPC_REQ_COPY_BYTES(p_c->info, (uint8_t *)p_a->info, str_len + 1);
+		}
+		break;
+#endif
 	} default: {
 		*failure_status = RPC_ERR_UNSUPPORTED_MSG;
 		ESP_LOGE(TAG, "Unsupported RPC Req[%u]",req->msg_id);

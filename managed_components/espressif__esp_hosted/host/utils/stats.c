@@ -1,28 +1,15 @@
-// SPDX-License-Identifier: Apache-2.0
-// Copyright 2015-2021 Espressif Systems (Shanghai) PTE LTD
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-//
+/*
+ * SPDX-FileCopyrightText: 2015-2025 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
 /** Includes **/
 
 #include "stats.h"
-#include "esp_hosted_header.h"
-#include "esp_hosted_config.h"
 #if TEST_RAW_TP
 #include "transport_drv.h"
 #endif
-#include "os_wrapper.h"
 #include "esp_log.h"
 #include "esp_hosted_transport_init.h"
 
@@ -130,7 +117,7 @@ static void raw_tp_tx_task(void const* pvParameters)
 		for (i=0; i<(TEST_RAW_TP__BUF_SIZE/4-1); i++, ptr++)
 			*ptr = 0xBAADF00D;
 
-		ret = esp_hosted_tx(ESP_TEST_IF, 0, raw_tp_tx_buf, TEST_RAW_TP__BUF_SIZE, H_BUFF_ZEROCOPY, H_DEFLT_FREE_FUNC, 0);
+		ret = esp_hosted_tx(ESP_TEST_IF, 0, raw_tp_tx_buf, TEST_RAW_TP__BUF_SIZE, H_BUFF_ZEROCOPY, raw_tp_tx_buf, H_DEFLT_FREE_FUNC, 0);
 
 #else
 		raw_tp_tx_buf = mempool_alloc(buf_mp_g, MAX_TRANSPORT_BUFFER_SIZE, true);
@@ -139,7 +126,7 @@ static void raw_tp_tx_task(void const* pvParameters)
 		for (i=0; i<(TEST_RAW_TP__BUF_SIZE/4-1); i++, ptr++)
 			*ptr = 0xBAADF00D;
 
-		ret = esp_hosted_tx(ESP_TEST_IF, 0, raw_tp_tx_buf, TEST_RAW_TP__BUF_SIZE, H_BUFF_ZEROCOPY, stats_mempool_free, 0);
+		ret = esp_hosted_tx(ESP_TEST_IF, 0, raw_tp_tx_buf, TEST_RAW_TP__BUF_SIZE, H_BUFF_ZEROCOPY, raw_tp_tx_buf, stats_mempool_free, 0);
 #endif
 		if (ret) {
 			ESP_LOGE(TAG, "Failed to send to queue\n");
@@ -159,7 +146,7 @@ static void process_raw_tp_flags(uint8_t cap)
 
 	if (test_raw_tp) {
 		hosted_timer_handler = g_h.funcs->_h_timer_start("raw_tp_timer", SEC_TO_MILLISEC(TEST_RAW_TP__TIMEOUT),
-				HOSTED_TIMER_PERIODIC, raw_tp_timer_func, NULL);
+				H_TIMER_TYPE_PERIODIC, raw_tp_timer_func, NULL);
 		if (!hosted_timer_handler) {
 			ESP_LOGE(TAG, "Failed to create timer\n\r");
 			return;

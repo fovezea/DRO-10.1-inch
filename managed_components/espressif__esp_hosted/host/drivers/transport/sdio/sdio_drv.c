@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2024 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2024-2025 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -84,9 +84,9 @@
 #include "esp_hosted_transport_init.h"
 #include "power_save_drv.h"
 #include "esp_hosted_power_save.h"
-#include "esp_hosted_config.h"
 #include "esp_hosted_transport_config.h"
-
+#include "esp_hosted_bt.h"
+#include "port_esp_hosted_host_config.h"
 
 static const char TAG[] = "H_SDIO_DRV";
 
@@ -97,8 +97,10 @@ static const char TAG[] = "H_SDIO_DRV";
 #define DO_COMBINED_REG_READ (1)
 
 /** Constants/Macros **/
-#define TO_SLAVE_QUEUE_SIZE               H_SDIO_TX_Q
-#define FROM_SLAVE_QUEUE_SIZE             H_SDIO_RX_Q
+
+// default queue sizes if unable to get from transport config
+#define DEFAULT_TO_SLAVE_QUEUE_SIZE       20
+#define DEFAULT_FROM_SLAVE_QUEUE_SIZE     20
 
 #define RX_TASK_STACK_SIZE                CONFIG_ESP_HOSTED_DFLT_TASK_STACK
 #define TX_TASK_STACK_SIZE                CONFIG_ESP_HOSTED_DFLT_TASK_STACK
@@ -672,7 +674,7 @@ static int is_valid_sdio_rx_packet(uint8_t *rxbuff_a, uint16_t *len_a, uint16_t 
 
 	if (is_wakeup_pkt && len<1500) {
 		ESP_LOGI(TAG, "Host wakeup triggered, len: %u ", len);
-		ESP_HEXLOGW("Wakeup_pkt", rxbuff_a+offset, len, min(len,128));
+		ESP_HEXLOGW("Wakeup_pkt", rxbuff_a+offset, len, H_MIN(len,128));
 	}
 
 	if ((!len) ||
@@ -822,9 +824,9 @@ static uint8_t * sdio_rx_get_buffer(uint32_t len)
 	if (len > double_buf.buffer[index].buf_size) {
 		if (*buf) {
 			// free already allocated memory
-			g_h.funcs->_h_free(*buf);
+			g_h.funcs->_h_free_align(*buf);
 		}
-		*buf = (uint8_t *)MEM_ALLOC(len);
+		*buf = (uint8_t *)g_h.funcs->_h_malloc_align(len, HOSTED_MEM_ALIGNMENT_64);
 		assert(*buf);
 		double_buf.buffer[index].buf_size = len;
 		ESP_LOGD(TAG, "buf %d size: %ld", index, double_buf.buffer[index].buf_size);
@@ -908,46 +910,6 @@ static void sdio_data_to_rx_buf_task(void const* pvParameters)
 }
 
 
-#if H_HOST_USES_STATIC_NETIF
-esp_netif_t *s_netif_sta = NULL;
-
-esp_netif_t * create_sta_netif_with_static_ip(void)
-{
-	ESP_LOGI(TAG, "Create netif with static IP");
-	/* Create "almost" default station, but with un-flagged DHCP client */
-	esp_netif_inherent_config_t netif_cfg;
-	memcpy(&netif_cfg, ESP_NETIF_BASE_DEFAULT_WIFI_STA, sizeof(netif_cfg));
-	netif_cfg.flags &= ~ESP_NETIF_DHCP_CLIENT;
-	esp_netif_config_t cfg_sta = {
-		.base = &netif_cfg,
-		.stack = ESP_NETIF_NETSTACK_DEFAULT_WIFI_STA,
-	};
-	esp_netif_t *sta_netif = esp_netif_new(&cfg_sta);
-	assert(sta_netif);
-
-	ESP_LOGI(TAG, "Creating slave sta netif with static IP");
-
-	ESP_ERROR_CHECK(esp_netif_attach_wifi_station(sta_netif));
-	ESP_ERROR_CHECK(esp_wifi_set_default_wifi_sta_handlers());
-
-	/* stop dhcpc */
-	ESP_ERROR_CHECK(esp_netif_dhcpc_stop(sta_netif));
-
-	return sta_netif;
-}
-
-static esp_err_t create_static_netif(void)
-{
-	/* Only initialize networking stack if not already initialized */
-	if (!s_netif_sta) {
-		esp_netif_init();
-		esp_event_loop_create_default();
-		s_netif_sta = create_sta_netif_with_static_ip();
-		assert(s_netif_sta);
-	}
-	return ESP_OK;
-}
-#endif
 
 static void sdio_read_task(void const* pvParameters)
 {
@@ -975,13 +937,10 @@ static void sdio_read_task(void const* pvParameters)
 			break;
 		}
 	}
-#if H_HOST_USES_STATIC_NETIF
-	create_static_netif();
-#endif
 
 
 #if DO_COMBINED_REG_READ
-	reg_buf = MEM_ALLOC(REG_BUF_LEN);
+	reg_buf = g_h.funcs->_h_malloc_align(REG_BUF_LEN, HOSTED_MEM_ALIGNMENT_64);
 	assert(reg_buf);
 #endif
 
@@ -1216,7 +1175,7 @@ static void sdio_process_rx_task(void const* pvParameters)
 			ESP_LOGI(TAG, "Write thread started");
 			sdio_start_write_thread = true;
 		} else if (buf_handle->if_type == ESP_HCI_IF) {
-			hci_rx_handler(buf_handle);
+			hci_rx_handler(buf_handle->payload, buf_handle->payload_len);
 		} else if (buf_handle->if_type == ESP_TEST_IF) {
 #if TEST_RAW_TP
 			update_test_raw_tp_rx_len(buf_handle->payload_len +
@@ -1241,16 +1200,38 @@ static void sdio_process_rx_task(void const* pvParameters)
 void *bus_init_internal(void)
 {
 	uint8_t prio_q_idx = 0;
+
+	int tx_queue_size = DEFAULT_TO_SLAVE_QUEUE_SIZE;
+	int rx_queue_size = DEFAULT_FROM_SLAVE_QUEUE_SIZE;
+
+	struct esp_hosted_sdio_config *psdio_config;
+
+	// get queue sizes from transport config
+	if (ESP_TRANSPORT_OK == esp_hosted_sdio_get_config(&psdio_config)) {
+		tx_queue_size = psdio_config->tx_queue_size;
+		rx_queue_size = psdio_config->rx_queue_size;
+		if (!tx_queue_size) {
+			tx_queue_size = DEFAULT_TO_SLAVE_QUEUE_SIZE;
+			ESP_LOGW(TAG, "provided sdio tx queue size is zero! Setting to %d", tx_queue_size);
+		}
+		if (!rx_queue_size) {
+			rx_queue_size = DEFAULT_FROM_SLAVE_QUEUE_SIZE;
+			ESP_LOGW(TAG, "provided sdio rx queue size is zero! Setting to %d", rx_queue_size);
+		}
+	} else {
+		ESP_LOGW(TAG, "failed to get SDIO transport config: using default values");
+	}
+
 	/* register callback */
 
 	sdio_bus_lock = g_h.funcs->_h_create_mutex();
 	assert(sdio_bus_lock);
 
-	sem_to_slave_queue = g_h.funcs->_h_create_semaphore(TO_SLAVE_QUEUE_SIZE*MAX_PRIORITY_QUEUES);
+	sem_to_slave_queue = g_h.funcs->_h_create_semaphore(tx_queue_size * MAX_PRIORITY_QUEUES);
 	assert(sem_to_slave_queue);
 	g_h.funcs->_h_get_semaphore(sem_to_slave_queue, 0);
 
-	sem_from_slave_queue = g_h.funcs->_h_create_semaphore(FROM_SLAVE_QUEUE_SIZE*MAX_PRIORITY_QUEUES);
+	sem_from_slave_queue = g_h.funcs->_h_create_semaphore(rx_queue_size * MAX_PRIORITY_QUEUES);
 	assert(sem_from_slave_queue);
 	g_h.funcs->_h_get_semaphore(sem_from_slave_queue, 0);
 
@@ -1259,11 +1240,11 @@ void *bus_init_internal(void)
 
 	for (prio_q_idx=0; prio_q_idx<MAX_PRIORITY_QUEUES;prio_q_idx++) {
 		/* Queue - rx */
-		from_slave_queue[prio_q_idx] = g_h.funcs->_h_create_queue(FROM_SLAVE_QUEUE_SIZE, sizeof(interface_buffer_handle_t));
+		from_slave_queue[prio_q_idx] = g_h.funcs->_h_create_queue(rx_queue_size, sizeof(interface_buffer_handle_t));
 		assert(from_slave_queue[prio_q_idx]);
 
 		/* Queue - tx */
-		to_slave_queue[prio_q_idx] = g_h.funcs->_h_create_queue(TO_SLAVE_QUEUE_SIZE, sizeof(interface_buffer_handle_t));
+		to_slave_queue[prio_q_idx] = g_h.funcs->_h_create_queue(tx_queue_size, sizeof(interface_buffer_handle_t));
 		assert(to_slave_queue[prio_q_idx]);
 	}
 
@@ -1308,34 +1289,43 @@ void *bus_init_internal(void)
 	return sdio_handle;
 }
 
+/**
+  * @brief  Send to slave
+  * @param  iface_type -type of interface
+  *         iface_num - interface number
+  *         payload_buf - tx buffer
+  *         payload_len - size of tx buffer
+  *         buffer_to_free - buffer to be freed after tx
+  *         free_buf_func - function used to free buffer_to_free
+  *         flags - flags to set
+  * @retval int - ESP_OK or ESP_FAIL
+  */
 int esp_hosted_tx(uint8_t iface_type, uint8_t iface_num,
-		uint8_t * wbuffer, uint16_t wlen, uint8_t buff_zcopy,
-		void (*free_wbuf_fun)(void* ptr), uint8_t flag)
+		uint8_t *payload_buf, uint16_t payload_len, uint8_t buff_zcopy,
+		uint8_t *buffer_to_free, void (*free_buf_func)(void *ptr), uint8_t flags)
 {
 	interface_buffer_handle_t buf_handle = {0};
 	void (*free_func)(void* ptr) = NULL;
 	uint8_t pkt_prio = PRIO_Q_OTHERS;
 	uint8_t transport_up = is_transport_tx_ready();
 
-	if (free_wbuf_fun)
-		free_func = free_wbuf_fun;
+	if (free_buf_func)
+		free_func = free_buf_func;
 
-
-	if ((!wbuffer || !wlen || (wlen > MAX_PAYLOAD_SIZE) || !transport_up)) {
-
+	if (!payload_buf || !payload_len || (payload_len > MAX_PAYLOAD_SIZE) || !transport_up) {
 		ESP_LOGE(TAG, "tx fail: NULL buff, invalid len (%u) or len > max len (%u), transport_up(%u))",
-				wlen, MAX_PAYLOAD_SIZE, transport_up);
-		H_FREE_PTR_WITH_FUNC(free_func, wbuffer);
+				payload_len, MAX_PAYLOAD_SIZE, transport_up);
+		H_FREE_PTR_WITH_FUNC(free_func, buffer_to_free);
 		return ESP_FAIL;
 	}
 	buf_handle.payload_zcopy = buff_zcopy;
 	buf_handle.if_type = iface_type;
 	buf_handle.if_num = iface_num;
-	buf_handle.payload_len = wlen;
-	buf_handle.payload = wbuffer;
-	buf_handle.priv_buffer_handle = wbuffer;
+	buf_handle.payload_len = payload_len;
+	buf_handle.payload = payload_buf;
+	buf_handle.priv_buffer_handle = buffer_to_free;
 	buf_handle.free_buf_handle = free_func;
-	buf_handle.flag = flag;
+	buf_handle.flag = flags;
 
 	if (buf_handle.if_type == ESP_SERIAL_IF)
 		pkt_prio = PRIO_Q_SERIAL;
@@ -1368,28 +1358,46 @@ void check_if_max_freq_used(uint8_t chip_type)
 #endif
 }
 
+#define CARD_INIT_DELAY_MS 100
 
-static esp_err_t transport_card_init(void *bus_handle)
+// retry until timeout_ms
+static esp_err_t transport_card_init(void *bus_handle, uint32_t timeout_ms)
 {
-	return g_h.funcs->_h_sdio_card_init(bus_handle);
+	int num_loops = timeout_ms / CARD_INIT_DELAY_MS;
+	int i = 0;
+	int res = ESP_FAIL;
+
+	// call card init, even if timeout_ms is 0
+	do {
+		res = g_h.funcs->_h_sdio_card_init(bus_handle, (i == 0) ? true : false);
+		g_h.funcs->_h_msleep(100);
+		if (res == ESP_OK) {
+			break;
+		}
+		i++;
+	} while (i < num_loops);
+
+	return res;
 }
 
 static esp_err_t transport_gpio_reset(void *bus_handle, gpio_pin_t reset_pin)
 {
 	g_h.funcs->_h_config_gpio(reset_pin.port, reset_pin.pin, H_GPIO_MODE_DEF_OUTPUT);
 	g_h.funcs->_h_write_gpio(reset_pin.port, reset_pin.pin, H_RESET_VAL_ACTIVE);
-	g_h.funcs->_h_msleep(1);
+	g_h.funcs->_h_msleep(10);
 	g_h.funcs->_h_write_gpio(reset_pin.port, reset_pin.pin, H_RESET_VAL_INACTIVE);
-	g_h.funcs->_h_msleep(1);
+	g_h.funcs->_h_msleep(10);
 	g_h.funcs->_h_write_gpio(reset_pin.port, reset_pin.pin, H_RESET_VAL_ACTIVE);
-	g_h.funcs->_h_msleep(1200);
+	g_h.funcs->_h_msleep(H_HOST_SDIO_RESET_DELAY_MS);
 	return ESP_OK;
 }
+
+#define CARD_INIT_TIMEOUT_MS 1500
 
 int ensure_slave_bus_ready(void *bus_handle)
 {
 	int res = -1;
-	gpio_pin_t reset_pin = { .port = H_GPIO_PIN_RESET_Port, .pin = H_GPIO_PIN_RESET_Pin };
+	gpio_pin_t reset_pin = { .port = H_GPIO_PORT_RESET, .pin = H_GPIO_PIN_RESET };
 
 	if (ESP_TRANSPORT_OK != esp_hosted_transport_get_reset_config(&reset_pin)) {
 		ESP_LOGE(TAG, "Unable to get RESET config for transport");
@@ -1403,7 +1411,7 @@ int ensure_slave_bus_ready(void *bus_handle)
 #if H_SLAVE_RESET_ONLY_IF_NECESSARY
 	{
 		/* Reset will be done later if needed during communication initialization */
-		res = transport_card_init(bus_handle);
+		res = transport_card_init(bus_handle, CARD_INIT_TIMEOUT_MS);
 		if (res) {
 			ESP_LOGE(TAG, "card init failed");
 		} else {
@@ -1418,7 +1426,7 @@ int ensure_slave_bus_ready(void *bus_handle)
 			transport_gpio_reset(bus_handle, reset_pin);
 		}
 
-		res = transport_card_init(bus_handle);
+		res = transport_card_init(bus_handle, CARD_INIT_TIMEOUT_MS);
 		if (res) {
 			ESP_LOGE(TAG, "card init failed even after slave reset");
 		} else {
@@ -1434,7 +1442,7 @@ int ensure_slave_bus_ready(void *bus_handle)
 		g_h.funcs->_h_msleep(500);
 		set_transport_state(TRANSPORT_RX_ACTIVE);
 
-		res = transport_card_init(bus_handle);
+		res = transport_card_init(bus_handle, CARD_INIT_TIMEOUT_MS);
 		if (res) {
 			ESP_LOGE(TAG, "card init failed");
 		} else {
@@ -1446,7 +1454,7 @@ int ensure_slave_bus_ready(void *bus_handle)
 		ESP_LOGW(TAG, "Reset slave using GPIO[%u]", reset_pin.pin);
 		transport_gpio_reset(bus_handle, reset_pin);
 
-		res = transport_card_init(bus_handle);
+		res = transport_card_init(bus_handle, CARD_INIT_TIMEOUT_MS);
 		if (res) {
 			ESP_LOGE(TAG, "card init failed");
 		} else {

@@ -1,17 +1,8 @@
-// SPDX-License-Identifier: Apache-2.0
-// Copyright 2015-2021 Espressif Systems (Shanghai) PTE LTD
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+ * SPDX-FileCopyrightText: 2015-2025 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
 /** Includes **/
 #include <inttypes.h>
@@ -23,19 +14,16 @@
 #include "esp_hosted_transport_config.h"
 #include "esp_hosted_host_fw_ver.h"
 #include "stats.h"
-#include "esp_log.h"
 #include "esp_hosted_log.h"
 #include "serial_drv.h"
 #include "serial_ll_if.h"
-#include "esp_hosted_config.h"
 #include "mempool.h"
 #include "stats.h"
 #include "errno.h"
 #include "hci_drv.h"
-
-#if H_HOST_PS_ALLOWED
+#include "port_esp_hosted_host_config.h"
+#include "port_esp_hosted_host_log.h"
 #include "esp_hosted_power_save.h"
-#endif
 
 #include "esp_hosted_cli.h"
 #include "rpc_wrap.h"
@@ -116,13 +104,6 @@ static void transport_drv_init(void)
 	bus_handle = bus_init_internal();
 	ESP_LOGD(TAG, "Bus handle: %p", bus_handle);
 	assert(bus_handle);
-#if H_NETWORK_SPLIT_ENABLED
-	ESP_LOGI(TAG, "Network split enabled. Port ranges- Host:TCP(%d-%d), UDP(%d-%d), Slave:TCP(%d-%d), UDP(%d-%d)",
-		H_HOST_TCP_LOCAL_PORT_RANGE_START, H_HOST_TCP_LOCAL_PORT_RANGE_END,
-		H_HOST_UDP_LOCAL_PORT_RANGE_START, H_HOST_UDP_LOCAL_PORT_RANGE_END,
-		H_SLAVE_TCP_REMOTE_PORT_RANGE_START, H_SLAVE_TCP_REMOTE_PORT_RANGE_END,
-		H_SLAVE_UDP_REMOTE_PORT_RANGE_START, H_SLAVE_UDP_REMOTE_PORT_RANGE_END);
-#endif
 	hci_drv_init();
 }
 
@@ -187,7 +168,10 @@ esp_err_t transport_drv_reconfigure(void)
 	/* This would come into picture, only if the host has
 	 * reset pin connected to slave's 'EN' or 'RST' GPIO */
 	if (!is_transport_tx_ready()) {
-		ensure_slave_bus_ready(bus_handle);
+		if (ESP_OK != ensure_slave_bus_ready(bus_handle)) {
+			ESP_LOGE(TAG, "ensure_slave_bus_ready failed");
+			return ESP_FAIL;
+		}
 		transport_state = TRANSPORT_RX_ACTIVE;
 		ESP_LOGI(TAG, "Waiting for esp_hosted slave to be ready");
 		while (!is_transport_tx_ready()) {
@@ -195,7 +179,10 @@ esp_err_t transport_drv_reconfigure(void)
 				retry_slave_connection++;
 				if (retry_slave_connection%50==0) {
 					ESP_LOGI(TAG, "Not able to connect with ESP-Hosted slave device");
-					ensure_slave_bus_ready(bus_handle);
+					if (ESP_OK != ensure_slave_bus_ready(bus_handle)) {
+						ESP_LOGE(TAG, "ensure_slave_bus_ready failed");
+						return ESP_FAIL;
+					}
 				}
 			} else {
 				ESP_LOGW(TAG, "Failed to get ESP_Hosted slave transport up");
@@ -280,7 +267,7 @@ static esp_err_t transport_drv_sta_tx(void *h, void *buffer, size_t len)
 	assert(copy_buff);
 	g_h.funcs->_h_memcpy(copy_buff+H_ESP_PAYLOAD_HEADER_OFFSET, buffer, len);
 
-	return esp_hosted_tx(ESP_STA_IF, 0, copy_buff, len, H_BUFF_ZEROCOPY, transport_sta_free_cb, 0);
+	return esp_hosted_tx(ESP_STA_IF, 0, copy_buff, len, H_BUFF_ZEROCOPY, copy_buff, transport_sta_free_cb, 0);
 }
 
 static esp_err_t transport_drv_ap_tx(void *h, void *buffer, size_t len)
@@ -297,14 +284,14 @@ static esp_err_t transport_drv_ap_tx(void *h, void *buffer, size_t len)
 	assert(copy_buff);
 	g_h.funcs->_h_memcpy(copy_buff+H_ESP_PAYLOAD_HEADER_OFFSET, buffer, len);
 
-	return esp_hosted_tx(ESP_AP_IF, 0, copy_buff, len, H_BUFF_ZEROCOPY, transport_ap_free_cb, 0);
+	return esp_hosted_tx(ESP_AP_IF, 0, copy_buff, len, H_BUFF_ZEROCOPY, copy_buff, transport_ap_free_cb, 0);
 }
 
 esp_err_t transport_drv_serial_tx(void *h, void *buffer, size_t len)
 {
 	/* TODO */
 	assert(h && h==chan_arr[ESP_SERIAL_IF]->api_chan);
-	return esp_hosted_tx(ESP_SERIAL_IF, 0, buffer, len, H_BUFF_NO_ZEROCOPY, transport_serial_free_cb, 0);
+	return esp_hosted_tx(ESP_SERIAL_IF, 0, buffer, len, H_BUFF_NO_ZEROCOPY, buffer, transport_serial_free_cb, 0);
 }
 
 
@@ -365,7 +352,7 @@ transport_channel_t *transport_drv_add_channel(void *api_chan,
 	assert(channel->memp);
 #endif
 
-	ESP_LOGI(TAG, "Add ESP-Hosted channel IF[%u]: S[%u] Tx[%p] Rx[%p]",
+	ESP_LOGD(TAG, "Add ESP-Hosted channel IF[%u]: S[%u] Tx[%p] Rx[%p]",
 			if_type, secure, *tx, rx);
 
 	return channel;
@@ -503,6 +490,9 @@ static esp_err_t get_chip_str_from_id(int chip_id, char* chip_str)
 	case ESP_PRIV_FIRMWARE_CHIP_ESP32C5:
 		strcpy(chip_str, "esp32c5");
 		break;
+	case ESP_PRIV_FIRMWARE_CHIP_ESP32C61:
+		strcpy(chip_str, "esp32c61");
+		break;
 	default:
 		ESP_LOGW(TAG, "Unsupported chip id: %u", chip_id);
 		strcpy(chip_str, "unsupported");
@@ -531,6 +521,8 @@ static void verify_host_config_for_slave(uint8_t chip_type)
 	exp_chip_id = ESP_PRIV_FIRMWARE_CHIP_ESP32S3;
 #elif H_SLAVE_TARGET_ESP32C5
 	exp_chip_id = ESP_PRIV_FIRMWARE_CHIP_ESP32C5;
+#elif H_SLAVE_TARGET_ESP32C61
+	exp_chip_id = ESP_PRIV_FIRMWARE_CHIP_ESP32C61;
 #else
 	ESP_LOGW(TAG, "Incorrect host config for ESP slave chipset[%x]", chip_type);
 #endif
@@ -570,18 +562,17 @@ static int compare_fw_version(uint32_t slave_version)
 		return 0;
 	} else if (host_version > slave_version) {
 	    // host version > slave version
-		ESP_LOGW(TAG, "=== ESP-Hosted Version Warning ===");
-		printf("Version on Host is NEWER than version on co-processor\n");
-		printf("RPC requests sent by host may encounter timeout errors\n");
-		printf("or may not be supported by co-processor\n");
-		ESP_LOGW(TAG, "=== ESP-Hosted Version Warning ===");
+#ifndef CONFIG_ESP_HOSTED_FW_VERSION_MISMATCH_WARNING_SUPPRESS
+		ESP_LOGW(TAG, "Version mismatch: Host [%u.%u.%u] > Co-proc [%u.%u.%u] ==> Upgrade co-proc to avoid RPC timeouts",
+			ESP_HOSTED_VERSION_PRINTF_ARGS(host_version), ESP_HOSTED_VERSION_PRINTF_ARGS(slave_version));
+#endif
 		return -1;
 	} else {
 	    // host version < slave version
-		ESP_LOGW(TAG, "=== ESP-Hosted Version Warning ===");
-		printf("Version on Host is OLDER than version on co-processor\n");
-		printf("Host may not be compatible with co-processor\n");
-		ESP_LOGW(TAG, "=== ESP-Hosted Version Warning ===");
+#ifndef CONFIG_ESP_HOSTED_FW_VERSION_MISMATCH_WARNING_SUPPRESS
+		ESP_LOGW(TAG, "Version mismatch: Host [%u.%u.%u] < Co-proc [%u.%u.%u] ==> Upgrade host to avoid compatibility issues",
+			ESP_HOSTED_VERSION_PRINTF_ARGS(host_version), ESP_HOSTED_VERSION_PRINTF_ARGS(slave_version));
+#endif
 		return 1;
 	}
 }
@@ -645,7 +636,7 @@ esp_err_t send_slave_config(uint8_t host_cap, uint8_t firmware_chip_id,
 	/* payload len = Event len + sizeof(event type) + sizeof(event len) */
 	len += 2;
 
-	return esp_hosted_tx(ESP_PRIV_IF, 0, sendbuf, len, H_BUFF_NO_ZEROCOPY, g_h.funcs->_h_free, 0);
+	return esp_hosted_tx(ESP_PRIV_IF, 0, sendbuf, len, H_BUFF_NO_ZEROCOPY, sendbuf, g_h.funcs->_h_free, 0);
 }
 
 static int transport_delayed_init(void)
@@ -743,7 +734,8 @@ static int process_init_event(uint8_t *evt_buf, uint16_t len)
 		(chip_type != ESP_PRIV_FIRMWARE_CHIP_ESP32C2) &&
 		(chip_type != ESP_PRIV_FIRMWARE_CHIP_ESP32C3) &&
 		(chip_type != ESP_PRIV_FIRMWARE_CHIP_ESP32C6) &&
-		(chip_type != ESP_PRIV_FIRMWARE_CHIP_ESP32C5)) {
+		(chip_type != ESP_PRIV_FIRMWARE_CHIP_ESP32C5) &&
+		(chip_type != ESP_PRIV_FIRMWARE_CHIP_ESP32C61)) {
 		ESP_LOGI(TAG, "ESP board type is not mentioned, ignoring [%d]\n\r", chip_type);
 		chip_type = ESP_PRIV_FIRMWARE_CHIP_UNRECOGNIZED;
 		return -1;

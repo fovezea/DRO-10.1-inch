@@ -1,10 +1,17 @@
-// Copyright 2015-2022 Espressif Systems (Shanghai) PTE LTD
-/* SPDX-License-Identifier: GPL-2.0 OR Apache-2.0 */
+/*
+ * SPDX-FileCopyrightText: 2015-2025 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
 #include "rpc_core.h"
+#include "rpc_utils.h"
 #include "rpc_slave_if.h"
-#include "esp_log.h"
-#include <inttypes.h>
+#include "esp_hosted_transport.h"
+#include "port_esp_hosted_host_log.h"
+#include "port_esp_hosted_host_config.h"
+#include "esp_hosted_bitmasks.h"
+#include "esp_hosted_os_abstraction.h"
 
 DEFINE_LOG_TAG(rpc_evt);
 
@@ -81,7 +88,80 @@ int rpc_parse_evt(Rpc *rpc_msg, ctrl_cmd_t *app_ntfy)
 		p_a->reason = p_c->reason;
 
 		break;
-    } case RPC_ID__Event_WifiEventNoArgs: {
+#if H_WIFI_HE_SUPPORT
+	} case RPC_ID__Event_StaItwtSetup: {
+		wifi_event_sta_itwt_setup_t * p_a = &(app_ntfy->u.e_wifi_sta_itwt_setup);
+		RpcEventStaItwtSetup * p_c = rpc_msg->event_sta_itwt_setup;
+
+		ESP_LOGD(TAG, "EVENT: iTWT ->  setup");
+		RPC_FAIL_ON_NULL(event_sta_itwt_setup);
+		app_ntfy->resp_event_status = p_c->resp;
+
+		p_a->config.setup_cmd = p_c->config->setup_cmd;
+		p_a->config.trigger = H_GET_BIT(WIFI_ITWT_CONFIG_1_trigger_BIT, p_c->config->bitmask_1);
+		p_a->config.flow_type = H_GET_BIT(WIFI_ITWT_CONFIG_1_flow_type_BIT, p_c->config->bitmask_1);
+		// WIFI_ITWT_CONFIG_1_flow_id_BIT is three bits wide
+		p_a->config.flow_id = (p_c->config->bitmask_1 >> WIFI_ITWT_CONFIG_1_flow_id_BIT) & 0x07;
+		// WIFI_ITWT_CONFIG_1_wake_invl_expn_BIT is five bits wide
+		p_a->config.wake_invl_expn = (p_c->config->bitmask_1 >> WIFI_ITWT_CONFIG_1_wake_invl_expn_BIT) & 0x1F;
+		p_a->config.wake_duration_unit = H_GET_BIT(WIFI_ITWT_CONFIG_1_wake_duration_unit_BIT, p_c->config->bitmask_1);
+#if H_DECODE_WIFI_RESERVED_FIELD
+		p_a->config.reserved = (p_c->config->bitmask_1 >> WIFI_ITWT_CONFIG_1_MAX_USED_BIT) & WIFI_ITWT_CONFIG_1_RESERVED_BITMASK;
+#endif
+		p_a->config.min_wake_dura = p_c->config->min_wake_dura;
+		p_a->config.wake_invl_mant = p_c->config->wake_invl_mant;
+		p_a->config.twt_id = p_c->config->twt_id;
+		p_a->config.timeout_time_ms = p_c->config->timeout_time_ms;
+		p_a->status = p_c->status;
+		p_a->reason = p_c->reason;
+		p_a->target_wake_time = p_c->target_wake_time;
+
+		break;
+	} case RPC_ID__Event_StaItwtTeardown: {
+		wifi_event_sta_itwt_teardown_t * p_a = &(app_ntfy->u.e_wifi_sta_itwt_teardown);
+		RpcEventStaItwtTeardown * p_c = rpc_msg->event_sta_itwt_teardown;
+
+		ESP_LOGD(TAG, "EVENT: iTWT ->  teardown");
+		RPC_FAIL_ON_NULL(event_sta_itwt_teardown);
+		app_ntfy->resp_event_status = p_c->resp;
+
+		p_a->flow_id = p_c->flow_id;
+		p_a->status = p_c->status;
+
+		break;
+	} case RPC_ID__Event_StaItwtSuspend: {
+		wifi_event_sta_itwt_suspend_t * p_a = &(app_ntfy->u.e_wifi_sta_itwt_suspend);
+		RpcEventStaItwtSuspend * p_c = rpc_msg->event_sta_itwt_suspend;
+		int num_elements = sizeof(p_a->actual_suspend_time_ms) / sizeof(p_a->actual_suspend_time_ms[0]);
+		int i;
+
+		ESP_LOGD(TAG, "EVENT: iTWT ->  suspend");
+		RPC_FAIL_ON_NULL(event_sta_itwt_suspend);
+		app_ntfy->resp_event_status = p_c->resp;
+
+		p_a->status = p_c->status;
+		p_a->flow_id_bitmap = p_c->flow_id_bitmap;
+
+		memset(p_a->actual_suspend_time_ms, 0, sizeof(p_a->actual_suspend_time_ms));
+		for (i = 0; i < H_MIN(num_elements, p_c->n_actual_suspend_time_ms); i++) {
+			p_a->actual_suspend_time_ms[i] = p_c->actual_suspend_time_ms[i];
+		}
+
+		break;
+	} case RPC_ID__Event_StaItwtProbe: {
+		wifi_event_sta_itwt_probe_t * p_a = &(app_ntfy->u.e_wifi_sta_itwt_probe);
+		RpcEventStaItwtProbe * p_c = rpc_msg->event_sta_itwt_probe;
+
+		ESP_LOGD(TAG, "EVENT: iTWT ->  probe");
+		RPC_FAIL_ON_NULL(event_sta_itwt_probe);
+		app_ntfy->resp_event_status = p_c->resp;
+
+		p_a->status = p_c->status;
+		p_a->reason = p_c->reason;
+
+		break;
+#endif
+	} case RPC_ID__Event_WifiEventNoArgs: {
 		RPC_FAIL_ON_NULL(event_wifi_event_no_args);
 		app_ntfy->resp_event_status = rpc_msg->event_wifi_event_no_args->resp;
         ESP_LOGI(TAG, "Event [0x%" PRIx32 "] received", rpc_msg->event_wifi_event_no_args->event_id);
@@ -124,7 +204,7 @@ int rpc_parse_evt(Rpc *rpc_msg, ctrl_cmd_t *app_ntfy)
 			break;
 		}
 		break;
-    } case RPC_ID__Event_StaScanDone: {
+	} case RPC_ID__Event_StaScanDone: {
 		RpcEventStaScanDone *p_c = rpc_msg->event_sta_scan_done;
 		wifi_event_sta_scan_done_t *p_a = &app_ntfy->u.e_wifi_sta_scan_done;
 		RPC_FAIL_ON_NULL(event_sta_scan_done);
@@ -185,6 +265,74 @@ int rpc_parse_evt(Rpc *rpc_msg, ctrl_cmd_t *app_ntfy)
 		g_h.funcs->_h_memcpy(p_a->dns_ip,  p_c->dns_ip.data,  p_c->dns_ip.len);
 
 		break;
+#if H_SUPP_DPP_SUPPORT
+	}
+	case RPC_ID__Event_SuppDppUriReady: {
+		RpcEventSuppDppUriReady *p_c = rpc_msg->event_supp_dpp_uri_ready;
+		supp_wifi_event_dpp_uri_ready_t *p_a = &app_ntfy->u.e_dpp_uri_ready;
+		app_ntfy->resp_event_status = rpc_msg->event_supp_dpp_uri_ready->resp;
+
+		g_h.funcs->_h_memset(p_a->uri, 0, DPP_URI_LEN_MAX);
+
+		p_a->uri_data_len = p_c->qrcode.len;
+		if (p_a->uri_data_len <= DPP_URI_LEN_MAX) {
+			g_h.funcs->_h_memcpy(p_a->uri, p_c->qrcode.data, p_a->uri_data_len);
+		} else {
+			ESP_LOGE(TAG, "Incoming URI is too long (over %d bytes). Increase Kconfig ESP_HOSTED_DPP_URI_LEN_MAX for proper operation", DPP_URI_LEN_MAX - 1);
+			p_a->uri_data_len = 0;
+		}
+		break;
+	}
+	case RPC_ID__Event_SuppDppCfgRecvd: {
+		RpcEventSuppDppCfgRecvd *p_c = rpc_msg->event_supp_dpp_cfg_recvd;
+		supp_wifi_event_dpp_config_received_t *p_a = &app_ntfy->u.e_dpp_config_received;
+		app_ntfy->resp_event_status = rpc_msg->event_supp_dpp_uri_ready->resp;
+
+		rpc_copy_wifi_sta_config(&p_a->wifi_cfg.sta, p_c->cfg->sta);
+		break;
+	}
+	case RPC_ID__Event_SuppDppFail: {
+		RpcEventSuppDppFail *p_c = rpc_msg->event_supp_dpp_fail;
+		supp_wifi_event_dpp_failed_t *p_a = &app_ntfy->u.e_dpp_failed;
+		app_ntfy->resp_event_status = rpc_msg->event_supp_dpp_fail->resp;
+
+		p_a->failure_reason = p_c->reason;
+		break;
+#endif // H_SUPP_DPP_SUPPORT
+#if H_WIFI_DPP_SUPPORT
+	}
+	case RPC_ID__Event_WifiDppUriReady: {
+		RpcEventWifiDppUriReady *p_c = rpc_msg->event_wifi_dpp_uri_ready;
+		supp_wifi_event_dpp_uri_ready_t *p_a = &app_ntfy->u.e_dpp_uri_ready;
+		app_ntfy->resp_event_status = rpc_msg->event_supp_dpp_uri_ready->resp;
+
+		g_h.funcs->_h_memset(p_a->uri, 0, DPP_URI_LEN_MAX);
+
+		p_a->uri_data_len = p_c->qrcode.len;
+		if (p_a->uri_data_len <= DPP_URI_LEN_MAX) {
+			g_h.funcs->_h_memcpy(p_a->uri, p_c->qrcode.data, p_a->uri_data_len);
+		} else {
+			ESP_LOGE(TAG, "Incoming URI is too long (over %d bytes). Increase Kconfig ESP_HOSTED_DPP_URI_LEN_MAX for proper operation", DPP_URI_LEN_MAX - 1);
+			p_a->uri_data_len = 0;
+		}
+		break;
+	}
+	case RPC_ID__Event_WifiDppCfgRecvd: {
+		RpcEventWifiDppCfgRecvd *p_c = rpc_msg->event_wifi_dpp_cfg_recvd;
+		supp_wifi_event_dpp_config_received_t *p_a = &app_ntfy->u.e_dpp_config_received;
+		app_ntfy->resp_event_status = rpc_msg->event_supp_dpp_uri_ready->resp;
+
+		rpc_copy_wifi_sta_config(&p_a->wifi_cfg.sta, p_c->cfg->sta);
+		break;
+	}
+	case RPC_ID__Event_WifiDppFail: {
+		RpcEventWifiDppFail *p_c = rpc_msg->event_wifi_dpp_fail;
+		supp_wifi_event_dpp_failed_t *p_a = &app_ntfy->u.e_dpp_failed;
+		app_ntfy->resp_event_status = rpc_msg->event_supp_dpp_fail->resp;
+
+		p_a->failure_reason = p_c->reason;
+		break;
+#endif // H_WIFI_DPP_SUPPORT
 	} default: {
 		ESP_LOGE(TAG, "Invalid/unsupported event[%u] received\n",rpc_msg->msg_id);
 		goto fail_parse_rpc_msg;

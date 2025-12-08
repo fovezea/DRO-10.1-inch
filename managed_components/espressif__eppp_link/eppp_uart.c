@@ -80,12 +80,12 @@ static esp_err_t init_uart(struct eppp_uart *h, struct eppp_config_uart_s *confi
     uart_config.data_bits = UART_DATA_8_BITS;
     uart_config.parity    = UART_PARITY_DISABLE;
     uart_config.stop_bits = UART_STOP_BITS_1;
-    uart_config.flow_ctrl = UART_HW_FLOWCTRL_DISABLE;
+    uart_config.flow_ctrl = config->flow_control;
     uart_config.source_clk = UART_SCLK_DEFAULT;
 
     ESP_RETURN_ON_ERROR(uart_driver_install(h->uart_port, config->rx_buffer_size, 0, config->queue_size, &h->uart_event_queue, 0), TAG, "Failed to install UART");
     ESP_RETURN_ON_ERROR(uart_param_config(h->uart_port, &uart_config), TAG, "Failed to set params");
-    ESP_RETURN_ON_ERROR(uart_set_pin(h->uart_port, config->tx_io, config->rx_io, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE), TAG, "Failed to set UART pins");
+    ESP_RETURN_ON_ERROR(uart_set_pin(h->uart_port, config->tx_io, config->rx_io, config->rts_io, config->cts_io), TAG, "Failed to set UART pins");
     ESP_RETURN_ON_ERROR(uart_set_rx_timeout(h->uart_port, 1), TAG, "Failed to set UART Rx timeout");
     return ESP_OK;
 }
@@ -157,6 +157,8 @@ static void process_packet(esp_netif_t *netif, uart_port_t uart_port, size_t ava
             esp_netif_receive(netif, in_buf + buf_start + sizeof(struct header), payload_size, NULL);
         } else {
 #ifdef CONFIG_EPPP_LINK_CHANNELS_SUPPORT
+            struct eppp_handle *handle = esp_netif_get_io_driver(netif);
+            struct eppp_uart *h = __containerof(handle, struct eppp_uart, parent);
             if (h->parent.channel_rx) {
                 h->parent.channel_rx(netif, channel, in_buf + buf_start + sizeof(struct header), payload_size);
             }
@@ -269,6 +271,7 @@ eppp_transport_handle_t eppp_uart_init(struct eppp_config_uart_s *config)
     ESP_GOTO_ON_ERROR(init_uart(h, config), err, TAG, "Failed to init UART");
     return &h->parent;
 err:
+    free(h);
     return NULL;
 }
 

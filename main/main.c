@@ -23,6 +23,8 @@
 #include "driver/gpio.h"
 #include "eez_ui.h"
 #include "ui.h"  // Include EEZ Studio generated UI
+#include "fpga_comms.h"
+
 
 // Include BSP for ESP32-P4 board
 #include "bsp/esp32_p4_function_ev_board.h"
@@ -336,8 +338,14 @@ void app_main(void)
     
     /* Initialize WiFi */
     wifi_init();
+
+    /* Initialize FPGA Comms */
+    if (fpga_comms_init() != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize FPGA Comms");
+    }
     
     /* Create tasks */
+
     // Create UI creation task (higher priority to run first)
     xTaskCreate(ui_creation_task, "ui_creation", 4096, NULL, 5, NULL);
     

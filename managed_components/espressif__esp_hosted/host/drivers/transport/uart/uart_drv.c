@@ -1,23 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2015-2024 Espressif Systems (Shanghai) PTE LTD
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+ * SPDX-FileCopyrightText: 2015-2025 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
 /** Includes **/
 
 #include "drivers/bt/hci_drv.h"
 
-#include "common.h"
 #include "endian.h"
 #include "esp_log.h"
 #include "esp_hosted_log.h"
@@ -26,7 +17,8 @@
 #include "esp_hosted_power_save.h"
 #include "esp_hosted_transport_config.h"
 #include "power_save_drv.h"
-
+#include "esp_hosted_bt.h"
+#include "port_esp_hosted_host_os.h"
 
 static const char TAG[] = "H_UART_DRV";
 
@@ -291,7 +283,7 @@ static void h_uart_process_rx_task(void const* pvParameters)
 				/* User can re-use this type of transaction */
 			}
 		} else if (buf_handle->if_type == ESP_HCI_IF) {
-			hci_rx_handler(buf_handle);
+			hci_rx_handler(buf_handle->payload, buf_handle->payload_len);
 		} else if (buf_handle->if_type == ESP_TEST_IF) {
 #if TEST_RAW_TP
 			update_test_raw_tp_rx_len(buf_handle->payload_len +
@@ -535,34 +527,45 @@ void *bus_init_internal(void)
 	return uart_handle;
 }
 
+/**
+  * @brief  Send to slave
+  * @param  iface_type -type of interface
+  *         iface_num - interface number
+  *         payload_buf - tx buffer
+  *         payload_len - size of tx buffer
+  *         buffer_to_free - buffer to be freed after tx
+  *         free_buf_func - function used to free buffer_to_free
+  *         flags - flags to set
+  * @retval int - ESP_OK or ESP_FAIL
+  */
 int esp_hosted_tx(uint8_t iface_type, uint8_t iface_num,
-		uint8_t * wbuffer, uint16_t wlen, uint8_t buff_zcopy,
-		void (*free_wbuf_fun)(void* ptr), uint8_t flag)
+		uint8_t *payload_buf, uint16_t payload_len, uint8_t buff_zcopy,
+		uint8_t *buffer_to_free, void (*free_buf_func)(void *ptr), uint8_t flags)
 {
 	interface_buffer_handle_t buf_handle = {0};
 	void (*free_func)(void* ptr) = NULL;
 	uint8_t pkt_prio = PRIO_Q_OTHERS;
 	uint8_t transport_up = is_transport_tx_ready();
 
-	if (free_wbuf_fun)
-		free_func = free_wbuf_fun;
+	if (free_buf_func)
+		free_func = free_buf_func;
 
-	if ((!flag) &&
-	     (!wbuffer || !wlen ||(wlen > MAX_PAYLOAD_SIZE) || !transport_up)) {
+	if ((flags == 0 || flags == MORE_FRAGMENT) &&
+	     (!payload_buf || !payload_len || (payload_len > MAX_PAYLOAD_SIZE) || !transport_up)) {
 		ESP_LOGE(TAG, "tx fail: NULL buff, invalid len (%u) or len > max len (%u), transport_up(%u))",
-				wlen, MAX_PAYLOAD_SIZE, transport_up);
-		H_FREE_PTR_WITH_FUNC(free_func, wbuffer);
+				payload_len, MAX_PAYLOAD_SIZE, transport_up);
+		H_FREE_PTR_WITH_FUNC(free_func, buffer_to_free);
 		return ESP_FAIL;
 	}
 
 	buf_handle.payload_zcopy = buff_zcopy;
 	buf_handle.if_type = iface_type;
 	buf_handle.if_num = iface_num;
-	buf_handle.payload_len = wlen;
-	buf_handle.payload = wbuffer;
-	buf_handle.priv_buffer_handle = wbuffer;
+	buf_handle.payload_len = payload_len;
+	buf_handle.payload = payload_buf;
+	buf_handle.priv_buffer_handle = buffer_to_free;
 	buf_handle.free_buf_handle = free_func;
-	buf_handle.flag = flag;
+	buf_handle.flag = flags;
 
 	if (buf_handle.if_type == ESP_SERIAL_IF)
 		pkt_prio = PRIO_Q_SERIAL;
@@ -642,7 +645,7 @@ void bus_deinit_internal(void *bus_handle)
 int ensure_slave_bus_ready(void *bus_handle)
 {
 	esp_err_t res = ESP_OK;
-	gpio_pin_t reset_pin = { .port = H_GPIO_PIN_RESET_Port, .pin = H_GPIO_PIN_RESET_Pin };
+	gpio_pin_t reset_pin = { .port = H_GPIO_PORT_RESET, .pin = H_GPIO_PIN_RESET };
 
 	if (ESP_TRANSPORT_OK != esp_hosted_transport_get_reset_config(&reset_pin)) {
 		ESP_LOGE(TAG, "Unable to get RESET config for transport");
@@ -658,9 +661,9 @@ int ensure_slave_bus_ready(void *bus_handle)
 		ESP_LOGI(TAG, "Resetting slave on UART bus with pin %d", reset_pin.pin);
 		g_h.funcs->_h_config_gpio(reset_pin.port, reset_pin.pin, H_GPIO_MODE_DEF_OUTPUT);
 		g_h.funcs->_h_write_gpio(reset_pin.port, reset_pin.pin, H_RESET_VAL_ACTIVE);
-		g_h.funcs->_h_msleep(1);
+		g_h.funcs->_h_msleep(10);
 		g_h.funcs->_h_write_gpio(reset_pin.port, reset_pin.pin, H_RESET_VAL_INACTIVE);
-		g_h.funcs->_h_msleep(1);
+		g_h.funcs->_h_msleep(10);
 		g_h.funcs->_h_write_gpio(reset_pin.port, reset_pin.pin, H_RESET_VAL_ACTIVE);
 		g_h.funcs->_h_msleep(1500);
 	} else {
@@ -697,7 +700,7 @@ int bus_inform_slave_host_power_save_start(void)
 	} else {
 		/* Use normal queue mechanism */
 		ret = esp_hosted_tx(ESP_SERIAL_IF, 0, NULL, 0,
-			H_BUFF_NO_ZEROCOPY, NULL, FLAG_POWER_SAVE_STARTED);
+			H_BUFF_NO_ZEROCOPY, NULL, NULL, FLAG_POWER_SAVE_STARTED);
 	}
 
 	return ret;
@@ -731,7 +734,7 @@ int bus_inform_slave_host_power_save_stop(void)
 	} else {
 		/* Use normal queue mechanism */
 		ret = esp_hosted_tx(ESP_SERIAL_IF, 0, NULL, 0,
-			H_BUFF_NO_ZEROCOPY, NULL, FLAG_POWER_SAVE_STOPPED);
+			H_BUFF_NO_ZEROCOPY, NULL, NULL, FLAG_POWER_SAVE_STOPPED);
 	}
 
 	return ret;

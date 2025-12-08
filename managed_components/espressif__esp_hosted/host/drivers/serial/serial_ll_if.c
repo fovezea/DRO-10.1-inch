@@ -1,26 +1,16 @@
-// SPDX-License-Identifier: Apache-2.0
-// Copyright 2015-2021 Espressif Systems (Shanghai) PTE LTD
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-//
+/*
+ * SPDX-FileCopyrightText: 2015-2025 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
 /** Includes **/
 #include "string.h"
 #include "serial_ll_if.h"
-#include "esp_log.h"
 #include "transport_drv.h"
 #include "esp_hosted_transport.h"
 #include "esp_hosted_header.h"
+#include "port_esp_hosted_host_log.h"
 #include "esp_hosted_log.h"
 
 DEFINE_LOG_TAG(serial_ll);
@@ -212,8 +202,54 @@ static int serial_ll_write(const serial_ll_handle_t * serial_ll_hdl,
 		return -1;
 	}
 
-	return esp_hosted_tx(serial_ll_hdl->if_type,
-		serial_ll_hdl->if_num, wbuffer, wlen, H_BUFF_NO_ZEROCOPY, H_DEFLT_FREE_FUNC, 0);
+	if (!wbuffer || !wlen) {
+		return -1;
+	}
+
+	if (wlen > MAX_FRAGMENTABLE_PAYLOAD_SIZE) {
+		ESP_LOGE(TAG, "Payload too large: %u bytes (max allowed: %u)", wlen, MAX_FRAGMENTABLE_PAYLOAD_SIZE);
+		return -1;
+	}
+
+	uint16_t offset = 0;
+	uint16_t remaining_len = wlen;
+	void (*free_func)(void *) = NULL;
+	uint8_t *buf_to_free = NULL;
+
+	while (remaining_len > 0) {
+		uint16_t frag_len = (remaining_len > MAX_PAYLOAD_SIZE) ? MAX_PAYLOAD_SIZE : remaining_len;
+		uint8_t *frag_ptr = wbuffer + offset;
+
+		uint8_t flags = 0;
+		if (remaining_len > MAX_PAYLOAD_SIZE) {
+			flags |= MORE_FRAGMENT;
+		}
+		else {
+			// FRAGMENTATION COMPLETED
+			buf_to_free = wbuffer;
+			free_func = H_DEFLT_FREE_FUNC;
+		}
+
+		int ret = esp_hosted_tx(serial_ll_hdl->if_type,
+					serial_ll_hdl->if_num,
+					frag_ptr,
+					frag_len,
+					H_BUFF_NO_ZEROCOPY,
+					buf_to_free, free_func,
+					flags);
+		if (ret != ESP_OK) {
+			if (flags & MORE_FRAGMENT) {
+				H_FREE_PTR_WITH_FUNC(H_DEFLT_FREE_FUNC, wbuffer);
+			}
+			ESP_LOGE(TAG, "esp_hosted_tx failed at offset=%u len=%u", offset, frag_len);
+			return ret;
+		}
+
+		offset += frag_len;
+		remaining_len -= frag_len;
+	}
+
+	return 0;
 }
 
 /**

@@ -17,9 +17,17 @@
 #include "esp_check.h"
 #include "esp_idf_version.h"
 
+#if defined(CONFIG_ESP_NETIF_RECEIVE_REPORT_ERRORS)
+typedef esp_err_t esp_netif_recv_ret_t;
+#define ESP_NETIF_OPTIONAL_RETURN_CODE(expr) expr
+#else
+typedef void esp_netif_recv_ret_t;
+#define ESP_NETIF_OPTIONAL_RETURN_CODE(expr)
+#endif // CONFIG_ESP_NETIF_RECEIVE_REPORT_ERRORS
+
 static const char *TAG = "eppp_tun_netif";
 
-static void tun_input(void *h, void *buffer, unsigned int len, void *eb)
+static esp_netif_recv_ret_t tun_input(void *h, void *buffer, unsigned int len, void *eb)
 {
     __attribute__((unused)) esp_err_t ret = ESP_OK;
     struct netif *netif = h;
@@ -31,11 +39,12 @@ static void tun_input(void *h, void *buffer, unsigned int len, void *eb)
     ESP_GOTO_ON_FALSE(pbuf_remove_header(p, SIZEOF_ETH_HDR) == 0, ESP_FAIL, err, TAG, "pbuf_remove_header failed");
     memcpy(p->payload, buffer, len);
     ESP_GOTO_ON_FALSE(netif->input(p, netif) == ERR_OK, ESP_FAIL, err, TAG, "failed to input packet to lwip");
-    return;
+    return ESP_NETIF_OPTIONAL_RETURN_CODE(ESP_OK);
 err:
     if (p) {
         pbuf_free(p);
     }
+    return ESP_NETIF_OPTIONAL_RETURN_CODE(ret);
 }
 
 static err_t tun_output(struct netif *netif, struct pbuf *p)
@@ -65,12 +74,13 @@ static err_t tun_output_v4(struct netif *netif, struct pbuf *p, const ip4_addr_t
     LWIP_UNUSED_ARG(ipaddr);
     return tun_output(netif, p);
 }
+#if LWIP_IPV6
 static err_t tun_output_v6(struct netif *netif, struct pbuf *p, const ip6_addr_t *ipaddr)
 {
     LWIP_UNUSED_ARG(ipaddr);
     return tun_output(netif, p);
 }
-
+#endif
 static err_t tun_init(struct netif *netif)
 {
     if (netif == NULL) {
@@ -151,9 +161,12 @@ static void cmd_ping_on_ping_end(esp_ping_handle_t hdl, void *args)
     }
     if (IP_IS_V4(&target_addr)) {
         ESP_LOGD(TAG, "\n--- %s ping statistics ---\n", inet_ntoa(*ip_2_ip4(&target_addr)));
-    } else {
+    }
+#if LWIP_IPV6
+    else {
         ESP_LOGD(TAG, "\n--- %s ping statistics ---\n", inet6_ntoa(*ip_2_ip6(&target_addr)));
     }
+#endif
     ESP_LOGI(TAG, "%" PRIu32 " packets transmitted, %" PRIu32 " received, %" PRIu32 "%% packet loss, time %" PRIu32 "ms\n",
              transmitted, received, loss, total_time_ms);
     esp_ping_delete_session(hdl);
@@ -163,12 +176,19 @@ esp_err_t eppp_check_connection(esp_netif_t *netif)
 {
     esp_err_t ret = ESP_OK;
     esp_ping_config_t config = ESP_PING_DEFAULT_CONFIG();
+#if CONFIG_LOG_MAXIMUM_LEVEL > 3
+    config.task_stack_size += 1024;  // Some additional stack needed for verbose logs
+#endif
     config.count = 100;
     ESP_LOGI(TAG, "Checking connection on EPPP interface #%" PRIu32, config.interface);
     ip_addr_t target_addr = {0};
     esp_netif_ip_info_t ip;
     esp_netif_get_ip_info(netif, &ip);
+#if LWIP_IPV6
     target_addr.u_addr.ip4.addr =  ip.gw.addr;
+#else
+    target_addr.addr =  ip.gw.addr;
+#endif
     config.target_addr = target_addr;
     esp_ping_callbacks_t cbs = {
         .cb_args = netif,
