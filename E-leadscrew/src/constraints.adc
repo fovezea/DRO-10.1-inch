@@ -1,0 +1,28 @@
+# Constraints for MLKPAI-FMin01 (EG4S20NG88)
+
+# 1. Clock (25MHz Crystal)
+set_pin_assignment {clk} { LOCATION = 34; }
+
+# 2. Reset (Button SW2)
+# Active Low
+set_pin_assignment {rst_n} { LOCATION = 31; }
+
+# 3. UART (Connect to ESP32 TX)
+# FPGA_UART_RXD = Pin 16
+set_pin_assignment {uart_rx} { LOCATION = 16; }
+# FPGA_UART_TXD = Pin 17
+set_pin_assignment {uart_tx} { LOCATION = 17; }
+
+# 4. Encoder Inputs
+# Using Pin 4 and Pin 5
+set_pin_assignment {enc_A} { LOCATION = 4; }
+set_pin_assignment {enc_B} { LOCATION = 5; }
+
+# 5. Motor Outputs (Step/Dir)
+# Axis 1: Pin 2 (LED6), Pin 3 (LED5)
+set_pin_assignment {step_out_1} { LOCATION = 2; }
+set_pin_assignment {dir_out_1} { LOCATION = 3; }
+
+# Axis 2: Pin 14 (LED4), Pin 51 (LED7)
+set_pin_assignment {step_out_2} { LOCATION = 14; }
+set_pin_assignment {dir_out_2} { LOCATION = 51; }
