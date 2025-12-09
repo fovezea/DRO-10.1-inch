@@ -103,6 +103,65 @@ DRO-10.1-inch/
 
 **Note**: This project is fully self-contained with all hardware drivers and BSP components included locally.
 
+## 🔧 **Electronic Lead Screw (E-Screw) Components**
+
+This project includes specialized components for electronic lead screw functionality, enabling automatic gear ratio calculations for screw cutting and taper turning operations.
+
+### **Component Overview**
+
+#### `fpga_comms` - FPGA Communication
+- **Purpose**: Bidirectional UART communication with FPGA electronic gearbox backend
+- **Protocol**: Packet-based with CRC8 validation (`[0xAA55][Len][Cmd][Payload][CRC][0x0A]`)
+- **Features**: 
+  - Command queue for reliable transmission
+  - Thread-safe state store for FPGA status
+  - Support for Set Ratio, Enable, and Work Mode commands
+- **State**: Tracks RPM, position, work mode, and connection status
+- **UART**: Configurable (default 9600 baud, pins 16/17)
+
+#### `machine_params` - Machine Configuration Storage
+- **Purpose**: Persistent storage of machine-specific parameters in NVS
+- **Parameters**:
+  - Leadscrew pitch (mm) - default: 2.0mm
+  - Motor steps per revolution - default: 1600 (200 steps × 8 microsteps)
+  - Encoder counts per revolution - default: 2400 (600 PPR × 4 quadrature)
+- **Features**: Automatic defaults, thread-safe access, power-cycle persistence
+
+#### `screw_calc` - Screw Thread Calculation
+- **Purpose**: Calculate simplified gear ratios for cutting threads at any pitch
+- **Formula**: `Ratio (N/D) = (Target_Pitch × Steps_Per_Rev) / (Leadscrew_Pitch × Encoder_Counts)`
+- **Features**:
+  - GCD algorithm for automatic simplification to lowest terms
+  - Precision optimization to find simplest equivalent fraction
+  - Example: M3 thread (0.5mm pitch) → calculates 1/3 ratio
+
+#### `cone_calc` - Taper/Cone Calculation
+- **Purpose**: Calculate dual-axis ratios for taper turning operations
+- **Formula**: `tan(angle) = X_feed / Z_feed`
+- **Features**:
+  - Independent Z-axis (longitudinal) and X-axis (cross-slide) ratios
+  - Trigonometric calculation for any taper angle
+  - Automatic ratio simplification for both axes
+
+### **E-Screw UI Integration**
+
+The E-Screw tab provides a complete interface for electronic lead screw operations:
+
+**Machine Settings Panel**:
+- Editable leadscrew pitch, motor steps, and encoder counts
+- Save button for persisting settings to NVS
+
+**Calculation Tools**:
+- **Screw Mode**: Enter target pitch (e.g., 0.5mm for M3) → automatic ratio calculation
+- **Conical Mode**: Enter taper angle (e.g., 30°) → dual-axis ratio calculation
+- Real-time result display with calculated ratios
+- Auto-update of ratio sliders
+
+**FPGA Status Display**:
+- Current RPM and position
+- Work mode (Screw/Follow/Conical)
+- Enabled status and connection indicator
+
 ## 🔧 **Technical Implementation Details**
 
 ### Display System

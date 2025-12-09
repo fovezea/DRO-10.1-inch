@@ -17,5 +17,5 @@
     "--background-index",
     "--compile-commands-dir=/home/felix/src/ESP4-JC8012P4A1C_I_W_Y-LVGL9/build"
   ],
-  "idf.portWin": "COM8"
+  "idf.portWin": "COM3"
 }

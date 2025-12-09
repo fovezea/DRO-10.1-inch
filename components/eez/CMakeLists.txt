@@ -8,6 +8,9 @@ idf_component_register(
         "eez_ui_vars.c"
         "generated/styles.c"
         "generated/images.c"
+        "e_screw_screen.c"
+        "dro_axis_helper.c"
+
     INCLUDE_DIRS 
         "."
         "generated"
@@ -16,6 +19,11 @@ idf_component_register(
         esp_lvgl_port
         esp_wifi_remote
         esp_wifi
+        fpga_comms
+        machine_params
+        screw_calc
+        cone_calc
+        axis_mapping
 )
 
 # Add EEZ Studio generated files

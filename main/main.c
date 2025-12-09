@@ -24,6 +24,9 @@
 #include "eez_ui.h"
 #include "ui.h"  // Include EEZ Studio generated UI
 #include "fpga_comms.h"
+#include "machine_params.h"
+#include "axis_mapping.h"
+#include "dro_axis_helper.h"
 
 
 // Include BSP for ESP32-P4 board
@@ -230,6 +233,9 @@ static void ui_creation_task(void *pvParameters)
     // Initialize EEZ Studio generated UI
     ui_init();
     
+    // Initialize DRO axis helpers after screens are created
+    dro_axis_helper_init();
+    
     // UI creation complete
     ESP_LOGI(TAG, "UI creation complete");
     
@@ -338,6 +344,12 @@ void app_main(void)
     
     /* Initialize WiFi */
     wifi_init();
+
+    /* Initialize Machine Parameters */
+    machine_params_init();
+
+    /* Initialize Axis Mapping */
+    axis_mapping_init();
 
     /* Initialize FPGA Comms */
     if (fpga_comms_init() != ESP_OK) {

@@ -8,6 +8,8 @@
 #include "vars.h"
 #include "styles.h"
 #include "ui.h"
+#include "../e_screw_screen.h"
+
 
 objects_t objects;
 lv_obj_t *tick_value_change_obj;
@@ -725,6 +727,22 @@ void create_screen_main() {
                         }
                     }
                 }
+                {
+                    // E-Screw Tab
+                    lv_obj_t *obj = lv_tabview_add_tab(parent_obj, "E-Screw");
+                    add_style_tab_style(obj);
+                    lv_obj_set_style_text_color(obj, lv_color_hex(0xfff9f600), LV_PART_MAIN | LV_STATE_DEFAULT);
+                    
+                    // Get the tab button and add explicit event handler
+                    lv_obj_t *tab_bar = lv_tabview_get_tab_bar(objects.obj0);
+                    lv_obj_t *tab_button = lv_obj_get_child_by_type(tab_bar, 3, &lv_button_class);
+                    if (tab_button) {
+                        lv_obj_add_event_cb(tab_button, tab_button_event_handler, LV_EVENT_CLICKED, (void*)3);
+                    }
+                    
+                    // Create E-Screw screen content
+                    create_e_screw_screen(obj);
+                }
             }
         }
     }
@@ -733,6 +751,9 @@ void create_screen_main() {
 }
 
 void tick_screen_main() {
+    // Update E-Screw screen
+    tick_e_screw_screen();
+    
     {
         char new_val_str[32];
         snprintf(new_val_str, sizeof(new_val_str), "%ld", get_var_active_space_number());
