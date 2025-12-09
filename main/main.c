@@ -342,8 +342,8 @@ void app_main(void)
     /* Initialize LVGL */
     ESP_ERROR_CHECK(app_lvgl_init());
     
-    /* Initialize WiFi */
-    wifi_init();
+    /* Initialize WiFi - DISABLED FOR DEBUGGING */
+    // wifi_init();
 
     /* Initialize Machine Parameters */
     machine_params_init();
@@ -367,8 +367,8 @@ void app_main(void)
     // Create system monitor task
     xTaskCreate(system_monitor_task, "system_monitor", 4096, NULL, 1, NULL);
     
-    // Create WiFi scan task
-    xTaskCreate(wifi_scan_task, "wifi_scan", 4096, NULL, 2, NULL);
+    // Create WiFi scan task - DISABLED FOR DEBUGGING
+    // xTaskCreate(wifi_scan_task, "wifi_scan", 4096, NULL, 2, NULL);
 }
 
 /**

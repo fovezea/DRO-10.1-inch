@@ -17,5 +17,7 @@
     "--background-index",
     "--compile-commands-dir=/home/felix/src/ESP4-JC8012P4A1C_I_W_Y-LVGL9/build"
   ],
-  "idf.portWin": "COM3"
+  "idf.portWin": "COM3",
+  "idf.espIdfPathWin": "C:\\Users\\Felix\\esp\\v5.5.1\\esp-idf",
+  "idf.toolsPathWin": "c:\\Users\\Felix"
 }
