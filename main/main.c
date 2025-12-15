@@ -41,7 +41,8 @@ static void wifi_scan_callback(void);
 static void network_selected_callback(const char *ssid);
 
 // Forward declaration for WiFi initialization  
-static void wifi_init(void);
+static esp_err_t wifi_init(void);
+static void wifi_init_task(void *pvParameters);
 
 // Forward declaration for UI tick task
 static void ui_tick_task(void *pvParameters);
@@ -98,8 +99,9 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
 
 /**
  * @brief Initialize WiFi with detailed logging
+ * @return esp_err_t ESP_OK on success, ESP_FAIL on failure
  */
-static void wifi_init(void)
+static esp_err_t wifi_init(void)
 {
     // Create event group
     wifi_event_group = xEventGroupCreate();
@@ -108,57 +110,61 @@ static void wifi_init(void)
     esp_err_t ret = esp_netif_init();
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "esp_netif_init failed: %s", esp_err_to_name(ret));
-        return;
+        return ESP_FAIL;
     }
     
     // Create default event loop
     ret = esp_event_loop_create_default();
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "esp_event_loop_create_default failed: %s", esp_err_to_name(ret));
-        return;
+        return ESP_FAIL;
     }
     
     // Create default WiFi station
     esp_netif_t *netif = esp_netif_create_default_wifi_sta();
     if (netif == NULL) {
         ESP_LOGE(TAG, "Failed to create default WiFi station");
-        return;
+        return ESP_FAIL;
     }
     
     // Initialize WiFi
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ret = esp_wifi_init(&cfg);
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "esp_wifi_init failed: %s", esp_err_to_name(ret));
-        return;
+        ESP_LOGE(TAG, "esp_wifi_init failed: %s (ESP-Hosted slave may not be responding)", esp_err_to_name(ret));
+        ESP_LOGW(TAG, "WiFi unavailable - ESP32-C6 slave device not responding");
+        return ESP_FAIL;
     }
     
     // Register event handler
     ret = esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "esp_event_handler_register (WIFI_EVENT) failed: %s", esp_err_to_name(ret));
-        return;
+        return ESP_FAIL;
     }
     
     ret = esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "esp_event_handler_register (IP_EVENT) failed: %s", esp_err_to_name(ret));
-        return;
+        return ESP_FAIL;
     }
     
     // Set WiFi mode
     ret = esp_wifi_set_mode(WIFI_MODE_STA);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "esp_wifi_set_mode failed: %s", esp_err_to_name(ret));
-        return;
+        return ESP_FAIL;
     }
     
     // Start WiFi
     ret = esp_wifi_start();
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "esp_wifi_start failed: %s", esp_err_to_name(ret));
-        return;
+        return ESP_FAIL;
     }
+    
+    ESP_LOGI(TAG, "WiFi initialized successfully");
+    return ESP_OK;
 }
 
 /**
@@ -166,8 +172,40 @@ static void wifi_init(void)
  */
 static void print_wifi_scan_results(void)
 {
-    // Just update the UI, no console output needed
-    // The scan results are displayed on the screen via EEZ UI
+    ESP_LOGI(TAG, "========== WiFi Scan Results ==========");
+    ESP_LOGI(TAG, "Found %d access point(s):", ap_count);
+    
+    if (ap_count == 0) {
+        ESP_LOGW(TAG, "No access points found");
+        ESP_LOGI(TAG, "==========================================");
+        return;
+    }
+    
+    ESP_LOGI(TAG, "%-4s  %-32s  %-18s  %-6s  %s", 
+             "No.", "SSID", "BSSID", "RSSI", "Channel");
+    ESP_LOGI(TAG, "------------------------------------------------------------");
+    
+    for (uint16_t i = 0; i < ap_count; i++) {
+        char ssid[33] = {0};
+        char bssid[18] = {0};
+        
+        // Copy SSID (may be empty for hidden networks)
+        if (ap_info[i].ssid[0] == 0) {
+            snprintf(ssid, sizeof(ssid), "<hidden>");
+        } else {
+            snprintf(ssid, sizeof(ssid), "%s", (char *)ap_info[i].ssid);
+        }
+        
+        // Format BSSID as MAC address
+        snprintf(bssid, sizeof(bssid), "%02X:%02X:%02X:%02X:%02X:%02X",
+                 ap_info[i].bssid[0], ap_info[i].bssid[1], ap_info[i].bssid[2],
+                 ap_info[i].bssid[3], ap_info[i].bssid[4], ap_info[i].bssid[5]);
+        
+        ESP_LOGI(TAG, "%-4d  %-32s  %-18s  %-6d  %d", 
+                 i + 1, ssid, bssid, ap_info[i].rssi, ap_info[i].primary);
+    }
+    
+    ESP_LOGI(TAG, "==========================================");
 }
 
 /**
@@ -328,6 +366,10 @@ static esp_err_t app_lvgl_init(void)
 
 void app_main(void)
 {
+    // Suppress cache subsystem error logs for non-fatal esp_cache_msync errors (error 103)
+    // These occur when ESP-Hosted slave is not responding and are non-fatal
+    esp_log_level_set("cache", ESP_LOG_WARN);
+    
     /* Initialize NVS */
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -341,9 +383,6 @@ void app_main(void)
     
     /* Initialize LVGL */
     ESP_ERROR_CHECK(app_lvgl_init());
-    
-    /* Initialize WiFi - DISABLED FOR DEBUGGING */
-    // wifi_init();
 
     /* Initialize Machine Parameters */
     machine_params_init();
@@ -367,8 +406,37 @@ void app_main(void)
     // Create system monitor task
     xTaskCreate(system_monitor_task, "system_monitor", 4096, NULL, 1, NULL);
     
-    // Create WiFi scan task - DISABLED FOR DEBUGGING
-    // xTaskCreate(wifi_scan_task, "wifi_scan", 4096, NULL, 2, NULL);
+    // Create delayed WiFi initialization task (runs after other components are ready)
+    xTaskCreate(wifi_init_task, "wifi_init", 4096, NULL, 2, NULL);
+}
+
+/**
+ * @brief Delayed WiFi initialization task
+ */
+static void wifi_init_task(void *pvParameters)
+{
+    // Wait for other components to fully initialize (5 seconds delay)
+    vTaskDelay(pdMS_TO_TICKS(5000));
+    
+    ESP_LOGI(TAG, "Starting delayed WiFi initialization...");
+    
+    /* Initialize WiFi */
+    esp_err_t ret = wifi_init();
+    
+    if (ret == ESP_OK) {
+        ESP_LOGI(TAG, "WiFi initialized successfully, starting scan task...");
+        // Wait a bit more before starting scan
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        
+        // Create WiFi scan task only if WiFi init succeeded
+        xTaskCreate(wifi_scan_task, "wifi_scan", 4096, NULL, 2, NULL);
+    } else {
+        ESP_LOGW(TAG, "WiFi initialization failed - ESP32-C6 slave may not be connected");
+        ESP_LOGW(TAG, "System will continue to operate without WiFi functionality");
+    }
+    
+    ESP_LOGI(TAG, "WiFi initialization task complete");
+    vTaskDelete(NULL);
 }
 
 /**

@@ -491,7 +491,12 @@ err:
 esp_err_t bsp_touch_new(const bsp_touch_config_t *config, esp_lcd_touch_handle_t *ret_touch)
 {
     /* Initilize I2C */
-    BSP_ERROR_CHECK_RETURN_ERR(bsp_i2c_init());
+    esp_err_t ret = bsp_i2c_init();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize I2C for touch: %s", esp_err_to_name(ret));
+        return ret;
+    }
+    ESP_LOGI(TAG, "I2C initialized for touch controller");
 
     /* Initialize touch */
     const esp_lcd_touch_config_t tp_cfg = {
@@ -512,8 +517,20 @@ esp_err_t bsp_touch_new(const bsp_touch_config_t *config, esp_lcd_touch_handle_t
     esp_lcd_panel_io_handle_t tp_io_handle = NULL;
     esp_lcd_panel_io_i2c_config_t tp_io_config = ESP_LCD_TOUCH_IO_I2C_GSL3680_CONFIG();
     tp_io_config.scl_speed_hz = CONFIG_BSP_I2C_CLK_SPEED_HZ;
-    ESP_RETURN_ON_ERROR(esp_lcd_new_panel_io_i2c(i2c_handle, &tp_io_config, &tp_io_handle), TAG, "");
-    return esp_lcd_touch_new_i2c_gsl3680(tp_io_handle, &tp_cfg, ret_touch);
+    ret = esp_lcd_new_panel_io_i2c(i2c_handle, &tp_io_config, &tp_io_handle);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to create touch I2C IO handle: %s", esp_err_to_name(ret));
+        return ret;
+    }
+    ESP_LOGI(TAG, "Touch I2C IO handle created");
+    
+    ret = esp_lcd_touch_new_i2c_gsl3680(tp_io_handle, &tp_cfg, ret_touch);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to create GSL3680 touch controller: %s", esp_err_to_name(ret));
+        return ret;
+    }
+    ESP_LOGI(TAG, "GSL3680 touch controller created successfully");
+    return ESP_OK;
 }
 
 #if (BSP_CONFIG_NO_GRAPHIC_LIB == 0)
@@ -582,8 +599,13 @@ static lv_display_t *bsp_display_lcd_init(const bsp_display_cfg_t *cfg)
 static lv_indev_t *bsp_display_indev_init(lv_display_t *disp)
 {
     esp_lcd_touch_handle_t tp;
-    BSP_ERROR_CHECK_RETURN_NULL(bsp_touch_new(NULL, &tp));
+    esp_err_t ret = bsp_touch_new(NULL, &tp);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize touch screen: %s", esp_err_to_name(ret));
+        return NULL;
+    }
     assert(tp);
+    ESP_LOGI(TAG, "Touch screen initialized successfully");
 
     /* Add touch input (for selected screen) */
     const lvgl_port_touch_cfg_t touch_cfg = {
@@ -591,7 +613,17 @@ static lv_indev_t *bsp_display_indev_init(lv_display_t *disp)
         .handle = tp,
     };
 
-    return lvgl_port_add_touch(&touch_cfg);
+    lv_indev_t *indev = lvgl_port_add_touch(&touch_cfg);
+    if (indev) {
+        ESP_LOGI(TAG, "Touch input device added successfully");
+        // Verify touch input device is properly configured
+        lv_indev_type_t indev_type = lv_indev_get_type(indev);
+        lv_indev_mode_t indev_mode = lv_indev_get_mode(indev);
+        ESP_LOGI(TAG, "Touch input device type: %d, mode: %d", indev_type, indev_mode);
+    } else {
+        ESP_LOGE(TAG, "Failed to add touch input device");
+    }
+    return indev;
 }
 
 lv_display_t *bsp_display_start(void)

@@ -46,7 +46,7 @@ static void axis_label_click_event(lv_event_t *e) {
     
     // Create rename dialog (larger to fit keyboard)
     rename_dialog = lv_obj_create(lv_screen_active());
-    lv_obj_set_size(rename_dialog, 500, 620);
+    lv_obj_set_size(rename_dialog, 500, 580);
     lv_obj_center(rename_dialog);
     lv_obj_set_style_bg_color(rename_dialog, lv_color_hex(0x303030), 0);
     lv_obj_set_style_border_color(rename_dialog, lv_color_hex(0x00BFFF), 0);
@@ -71,20 +71,21 @@ static void axis_label_click_event(lv_event_t *e) {
     lv_obj_set_size(rename_textarea, 460, 50);
     lv_textarea_set_one_line(rename_textarea, true);
     lv_textarea_set_max_length(rename_textarea, AXIS_NAME_MAX_LEN);
-    lv_textarea_set_text(rename_textarea, axis_mapping_get_axis_name(axis_index));
-    lv_textarea_set_placeholder_text(rename_textarea, "Enter axis name");
+    // Start with empty text field, show current name as placeholder
+    lv_textarea_set_text(rename_textarea, "");
+    lv_textarea_set_placeholder_text(rename_textarea, axis_mapping_get_axis_name(axis_index));
     
-    // Keyboard (positioned right under the input field)
+    // Keyboard (positioned directly below the input field)
     lv_obj_t *keyboard = lv_keyboard_create(rename_dialog);
-    lv_obj_set_pos(keyboard, 20, 150);
-    lv_obj_set_size(keyboard, 460, 360);
+    lv_obj_set_pos(keyboard, 20, -100);  // 
+    lv_obj_set_size(keyboard, 460, 270);  // Adjusted height to fit buttons below
     lv_keyboard_set_mode(keyboard, LV_KEYBOARD_MODE_TEXT_UPPER);
     lv_keyboard_set_textarea(keyboard, rename_textarea);
     
-    // OK Button (below keyboard)
+    // OK Button (below keyboard with spacing)
     lv_obj_t *ok_btn = lv_button_create(rename_dialog);
-    lv_obj_set_pos(ok_btn, 270, 530);
-    lv_obj_set_size(ok_btn, 200, 80);
+    lv_obj_set_pos(ok_btn, 270, 428);  // 16px gap below keyboard (142 + 270 + 16)
+    lv_obj_set_size(ok_btn, 200, 60);
     lv_obj_add_event_cb(ok_btn, rename_dialog_ok_event, LV_EVENT_CLICKED, NULL);
     lv_obj_set_style_bg_color(ok_btn, lv_color_hex(0x00AA00), 0);
     
@@ -93,10 +94,10 @@ static void axis_label_click_event(lv_event_t *e) {
     lv_obj_center(ok_label);
     lv_obj_set_style_text_font(ok_label, &lv_font_montserrat_24, 0);
     
-    // Cancel Button (below keyboard)
+    // Cancel Button (below keyboard with spacing)
     lv_obj_t *cancel_btn = lv_button_create(rename_dialog);
-    lv_obj_set_pos(cancel_btn, 30, 530);
-    lv_obj_set_size(cancel_btn, 200, 80);
+    lv_obj_set_pos(cancel_btn, 30, 428);  // 16px gap below keyboard (142 + 270 + 16)
+    lv_obj_set_size(cancel_btn, 200, 60);
     lv_obj_add_event_cb(cancel_btn, rename_dialog_cancel_event, LV_EVENT_CLICKED, NULL);
     lv_obj_set_style_bg_color(cancel_btn, lv_color_hex(0xAA0000), 0);
     

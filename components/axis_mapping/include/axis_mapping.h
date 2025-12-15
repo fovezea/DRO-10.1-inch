@@ -7,11 +7,11 @@
 #define NUM_VIRTUAL_AXES 5
 
 // Default axis names
-#define DEFAULT_AXIS_0_NAME "X-Axis"
-#define DEFAULT_AXIS_1_NAME "Y-Axis"
-#define DEFAULT_AXIS_2_NAME "Z-Axis"
-#define DEFAULT_AXIS_3_NAME "C-Axis"
-#define DEFAULT_AXIS_4_NAME "W-Axis"
+#define DEFAULT_AXIS_0_NAME "X"
+#define DEFAULT_AXIS_1_NAME "Y"
+#define DEFAULT_AXIS_2_NAME "Z"
+#define DEFAULT_AXIS_3_NAME "C"
+#define DEFAULT_AXIS_4_NAME "W"
 
 // Default mappings
 #define DEFAULT_Z_AXIS_MAPPING 2  // Z-Axis
