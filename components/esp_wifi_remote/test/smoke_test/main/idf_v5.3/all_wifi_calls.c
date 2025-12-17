@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2024 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2025 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -376,6 +376,12 @@ void run_all_wifi_apis(void)
         wifi_interface_t ifx = 0;
         wifi_phy_rate_t rate = 0;
         esp_wifi_config_80211_tx_rate(ifx, rate);
+    }
+
+    {
+        wifi_interface_t ifx = 0;
+        wifi_tx_rate_config_t *config = NULL;
+        esp_wifi_config_80211_tx(ifx, config);
     }
 
     {

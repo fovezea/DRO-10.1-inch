@@ -17,7 +17,10 @@ static wifi_rxcb_t s_rx_fn[CHANNELS];
 
 WEAK esp_err_t esp_wifi_remote_channel_rx(void *h, void *buffer, void *buff_to_free, size_t len)
 {
-    assert(h);
+    if (!h || !buffer) {
+        ESP_LOGE("esp_wifi_remote", "esp_wifi_remote_channel_rx: invalid handle or buffer");
+        return ESP_ERR_INVALID_ARG;
+    }
     if (h == s_channel[0] && s_rx_fn[0]) {
         return s_rx_fn[0](buffer, len, buff_to_free);
     }
@@ -56,16 +59,26 @@ WEAK esp_err_t esp_wifi_internal_reg_netstack_buf_cb(wifi_netstack_buf_ref_cb_t 
 
 WEAK void esp_wifi_internal_free_rx_buffer(void *buffer)
 {
-    free(buffer);
+    if (buffer) {
+        free(buffer);
+    }
 }
 
 WEAK esp_err_t esp_wifi_internal_tx_by_ref(wifi_interface_t ifx, void *buffer, size_t len, void *netstack_buf)
 {
+    if (!buffer) {
+        ESP_LOGE("esp_wifi_remote", "esp_wifi_internal_tx_by_ref: invalid buffer");
+        return ESP_ERR_INVALID_ARG;
+    }
     return esp_wifi_internal_tx(ifx, buffer, (uint16_t)len);
 }
 
 WEAK int esp_wifi_internal_tx(wifi_interface_t ifx, void *buffer, uint16_t len)
 {
+    if (!buffer) {
+        ESP_LOGE("esp_wifi_remote", "esp_wifi_internal_tx: invalid buffer");
+        return -1;
+    }
     if (ifx == WIFI_IF_STA && s_tx_cb[0]) {
 
         /* TODO: If not needed, remove arg3 */

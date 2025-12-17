@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2024 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2025 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -366,6 +366,11 @@ WEAK esp_err_t esp_wifi_remote_config_80211_tx_rate(wifi_interface_t ifx, wifi_p
     LOG_UNSUPPORTED_AND_RETURN(ESP_ERR_NOT_SUPPORTED);
 }
 
+WEAK esp_err_t esp_wifi_remote_config_80211_tx(wifi_interface_t ifx, wifi_tx_rate_config_t *config)
+{
+    LOG_UNSUPPORTED_AND_RETURN(ESP_ERR_NOT_SUPPORTED);
+}
+
 WEAK esp_err_t esp_wifi_remote_disable_pmf_config(wifi_interface_t ifx)
 {
     LOG_UNSUPPORTED_AND_RETURN(ESP_ERR_NOT_SUPPORTED);
@@ -427,6 +432,16 @@ WEAK esp_err_t esp_wifi_remote_set_bandwidths(wifi_interface_t ifx, wifi_bandwid
 }
 
 WEAK esp_err_t esp_wifi_remote_get_bandwidths(wifi_interface_t ifx, wifi_bandwidths_t *bw)
+{
+    LOG_UNSUPPORTED_AND_RETURN(ESP_ERR_NOT_SUPPORTED);
+}
+
+WEAK esp_err_t esp_wifi_remote_action_tx_req(wifi_action_tx_req_t *req)
+{
+    LOG_UNSUPPORTED_AND_RETURN(ESP_ERR_NOT_SUPPORTED);
+}
+
+WEAK esp_err_t esp_wifi_remote_remain_on_channel(wifi_roc_req_t *req)
 {
     LOG_UNSUPPORTED_AND_RETURN(ESP_ERR_NOT_SUPPORTED);
 }

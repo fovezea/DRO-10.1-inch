@@ -1,5 +1,24 @@
 # Changelog
 
+## 2.7.3
+
+### Bug Fixes
+
+- fixed RPC Response for OTA commands to return errors in responses correctly
+- fixed double free bug in host OTA example
+
+## 2.7.2
+
+### Bug Fixes
+
+- Stable workaround for ota writes to slave
+
+## 2.7.1
+
+- Add support for more PCBs:
+  - ESP32-P4 Core Board - with on-board C5
+  - ESP32-P4 Core Board - with on-board C6
+
 ## 2.7.0
 
 ### Bug Fixes

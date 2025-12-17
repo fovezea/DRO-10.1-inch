@@ -6,7 +6,6 @@
 
 #include "esp_check.h"
 #include "esp_log.h"
-#include "esp_memory_utils.h"
 
 #include "driver/spi_master.h"
 
@@ -126,17 +125,31 @@ int hosted_do_spi_transfer(void *trans)
     spi_transaction_t t = {0};
     struct hosted_transport_context_t * spi_trans = trans;
 
+    /* Validate input parameters */
+    if (!trans || !spi_trans) {
+        ESP_LOGE("spi_wrapper", "hosted_do_spi_transfer: invalid trans parameter");
+        return -1;
+    }
+
+    if (!spi_handle) {
+        ESP_LOGE("spi_wrapper", "hosted_do_spi_transfer: spi_handle not initialized");
+        return -1;
+    }
+
 #if SPI_WORKAROUND
     /* this ensures RX DMA data in cache is sync to memory */
-    if (spi_trans != NULL && spi_trans->rx_buf != NULL && 
-        esp_ptr_dma_capable(spi_trans->rx_buf) && spi_trans->tx_buf_size > 0) {
+    if (spi_trans->rx_buf != NULL && spi_trans->tx_buf_size > 0) {
         esp_err_t ret = esp_cache_msync((void *)spi_trans->rx_buf, spi_trans->tx_buf_size, ESP_CACHE_MSYNC_FLAG_DIR_C2M);
-        // Error 0x67 (103/ESP_ERR_INVALID_ARG) means invalid addr - non-fatal when slave is not responding
-        if (ret != ESP_OK && ret != 0x67) {
+        if (ret != ESP_OK) {
             ESP_LOGE("spi_wrapper", "esp_cache_msync failed for spi_transfer: addr=%p, length=%u, ret=0x%x", spi_trans->rx_buf, spi_trans->tx_buf_size, ret);
         }
     }
 #endif
+
+    if (spi_trans->tx_buf_size == 0) {
+        ESP_LOGE("spi_wrapper", "hosted_do_spi_transfer: invalid tx_buf_size");
+        return -1;
+    }
 
     t.length=spi_trans->tx_buf_size*8;
     t.tx_buffer=spi_trans->tx_buf;

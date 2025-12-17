@@ -193,10 +193,9 @@ static esp_err_t spi_hd_rddma_seg(uint8_t *out_data, int seg_len, uint32_t flags
 
 #if SPI_WORKAROUND
 	/* this ensures RX DMA data in cache is sync to memory */
-	if (out_data != NULL && esp_ptr_dma_capable(out_data) && padded_len > 0) {
+	if (out_data != NULL && padded_len > 0) {
 		esp_err_t ret = esp_cache_msync((void *)out_data, padded_len, ESP_CACHE_MSYNC_FLAG_DIR_C2M);
-		// Error 0x67 (103/ESP_ERR_INVALID_ARG) means invalid addr - non-fatal when slave is not responding
-		if (ret != ESP_OK && ret != 0x67) {
+		if (ret != ESP_OK) {
 			ESP_LOGE(TAG, "esp_cache_msync failed for rddma_seg: addr=%p, length=%u, ret=0x%x", out_data, padded_len, ret);
 		}
 	}
@@ -433,14 +432,14 @@ int hosted_spi_hd_read_reg(uint32_t reg, uint32_t *data, int poll, bool lock_req
 
 #if SPI_WORKAROUND
 	/* this ensures RX DMA data in cache is sync to memory */
-	// dma_data_buf is a static DMA-aligned buffer, but validate before cache sync
-	if (esp_ptr_dma_capable(dma_data_buf)) {
+#if USE_DMA_ALIGNED_BUF
+	if (dma_data_buf != NULL && DMA_ALIGNED_BUF_LEN > 0) {
 		esp_err_t ret = esp_cache_msync((void *)dma_data_buf, DMA_ALIGNED_BUF_LEN, ESP_CACHE_MSYNC_FLAG_DIR_C2M);
-		// Error 0x67 (103/ESP_ERR_INVALID_ARG) means invalid addr - non-fatal when slave is not responding
-		if (ret != ESP_OK && ret != 0x67) {
+		if (ret != ESP_OK) {
 			ESP_LOGE(TAG, "esp_cache_msync failed for read_reg: addr=%p, length=%u, ret=0x%x", dma_data_buf, DMA_ALIGNED_BUF_LEN, ret);
 		}
 	}
+#endif
 #endif
 
 #if USE_DMA_ALIGNED_BUF
@@ -458,14 +457,14 @@ int hosted_spi_hd_read_reg(uint32_t reg, uint32_t *data, int poll, bool lock_req
 	for (i = 0; i < poll; i++) {
 #if SPI_WORKAROUND
 		/* this ensures RX DMA data in cache is sync to memory */
-		// dma_data_buf is a static DMA-aligned buffer, but validate before cache sync
-		if (esp_ptr_dma_capable(dma_data_buf)) {
+#if USE_DMA_ALIGNED_BUF
+		if (dma_data_buf != NULL && DMA_ALIGNED_BUF_LEN > 0) {
 			esp_err_t ret = esp_cache_msync((void *)dma_data_buf, DMA_ALIGNED_BUF_LEN, ESP_CACHE_MSYNC_FLAG_DIR_C2M);
-			// Error 0x67 (103/ESP_ERR_INVALID_ARG) means invalid addr - non-fatal when slave is not responding
-			if (ret != ESP_OK && ret != 0x67) {
+			if (ret != ESP_OK) {
 				ESP_LOGE(TAG, "esp_cache_msync failed for read_reg poll: addr=%p, length=%u, ret=0x%x", dma_data_buf, DMA_ALIGNED_BUF_LEN, ret);
 			}
 		}
+#endif
 #endif
 
 #if USE_DMA_ALIGNED_BUF

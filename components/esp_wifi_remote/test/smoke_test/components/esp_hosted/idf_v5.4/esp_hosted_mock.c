@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2024 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2025 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -362,6 +362,11 @@ esp_err_t esp_wifi_remote_config_80211_tx_rate(wifi_interface_t ifx, wifi_phy_ra
     return ESP_OK;
 }
 
+esp_err_t esp_wifi_remote_config_80211_tx(wifi_interface_t ifx, wifi_tx_rate_config_t *config)
+{
+    return ESP_OK;
+}
+
 esp_err_t esp_wifi_remote_disable_pmf_config(wifi_interface_t ifx)
 {
     return ESP_OK;
@@ -423,6 +428,16 @@ esp_err_t esp_wifi_remote_set_bandwidths(wifi_interface_t ifx, wifi_bandwidths_t
 }
 
 esp_err_t esp_wifi_remote_get_bandwidths(wifi_interface_t ifx, wifi_bandwidths_t *bw)
+{
+    return ESP_OK;
+}
+
+esp_err_t esp_wifi_remote_action_tx_req(wifi_action_tx_req_t *req)
+{
+    return ESP_OK;
+}
+
+esp_err_t esp_wifi_remote_remain_on_channel(wifi_roc_req_t *req)
 {
     return ESP_OK;
 }

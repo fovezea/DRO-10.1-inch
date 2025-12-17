@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2024 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2025 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -358,6 +358,11 @@ esp_err_t esp_wifi_remote_get_country_code(char *country)
 }
 
 esp_err_t esp_wifi_remote_config_80211_tx_rate(wifi_interface_t ifx, wifi_phy_rate_t rate)
+{
+    return ESP_OK;
+}
+
+esp_err_t esp_wifi_remote_config_80211_tx(wifi_interface_t ifx, wifi_tx_rate_config_t *config)
 {
     return ESP_OK;
 }

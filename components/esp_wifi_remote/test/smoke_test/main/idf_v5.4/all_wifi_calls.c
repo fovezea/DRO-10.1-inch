@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2024 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2025 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -380,6 +380,12 @@ void run_all_wifi_apis(void)
 
     {
         wifi_interface_t ifx = 0;
+        wifi_tx_rate_config_t *config = NULL;
+        esp_wifi_config_80211_tx(ifx, config);
+    }
+
+    {
+        wifi_interface_t ifx = 0;
         esp_wifi_disable_pmf_config(ifx);
     }
 
@@ -445,6 +451,16 @@ void run_all_wifi_apis(void)
         wifi_interface_t ifx = 0;
         wifi_bandwidths_t *bw = NULL;
         esp_wifi_get_bandwidths(ifx, bw);
+    }
+
+    {
+        wifi_action_tx_req_t *req = NULL;
+        esp_wifi_action_tx_req(req);
+    }
+
+    {
+        wifi_roc_req_t *req = NULL;
+        esp_wifi_remain_on_channel(req);
     }
 
 }
