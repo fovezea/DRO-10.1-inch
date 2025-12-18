@@ -10,7 +10,7 @@
 //
 
 void init_style_label_axis_MAIN_DEFAULT(lv_style_t *style) {
-    lv_style_set_text_color(style, lv_color_hex(0xfff9f600));
+    lv_style_set_text_color(style, lv_color_hex(0xf9f600));
     lv_style_set_text_font(style, &ui_font_jet_brains_mono_bold_64);
     lv_style_set_text_align(style, LV_TEXT_ALIGN_CENTER);
     lv_style_set_align(style, LV_ALIGN_DEFAULT);
@@ -41,7 +41,7 @@ lv_style_t *get_style_label_axis_MAIN_DEFAULT() {
 void init_style_label_axis_MAIN_DISABLED(lv_style_t *style) {
     lv_style_set_text_align(style, LV_TEXT_ALIGN_CENTER);
     lv_style_set_text_font(style, &lv_font_montserrat_42);
-    lv_style_set_text_color(style, lv_color_hex(0xfff9f600));
+    lv_style_set_text_color(style, lv_color_hex(0xf9f600));
 };
 
 lv_style_t *get_style_label_axis_MAIN_DISABLED() {
@@ -75,7 +75,7 @@ void init_style_label_mm_MAIN_DEFAULT(lv_style_t *style) {
     lv_style_set_max_width(style, 50);
     lv_style_set_min_height(style, 50);
     lv_style_set_max_height(style, 50);
-    lv_style_set_text_color(style, lv_color_hex(0xfff9f600));
+    lv_style_set_text_color(style, lv_color_hex(0xf9f600));
     lv_style_set_align(style, LV_ALIGN_DEFAULT);
     lv_style_set_text_font(style, &lv_font_montserrat_22);
     lv_style_set_text_align(style, LV_TEXT_ALIGN_CENTER);
@@ -221,11 +221,13 @@ void remove_style_tab_style(lv_obj_t *obj) {
 void init_style_text_area_axis_value_MAIN_DEFAULT(lv_style_t *style) {
     lv_style_set_min_height(style, 80);
     lv_style_set_max_height(style, 80);
-    lv_style_set_min_width(style, 290);
-    lv_style_set_text_color(style, lv_color_hex(0xfff9f600));
+    lv_style_set_min_width(style, 335);
+    lv_style_set_text_color(style, lv_color_hex(0xf9f600));
     lv_style_set_text_font(style, &ui_font_jet_brains_mono_bold_64);
     lv_style_set_text_align(style, LV_TEXT_ALIGN_RIGHT);
     lv_style_set_pad_right(style, 10);
+    lv_style_set_bg_opa(style, LV_OPA_TRANSP);
+    lv_style_set_border_width(style, 0);
 };
 
 lv_style_t *get_style_text_area_axis_value_MAIN_DEFAULT() {
@@ -272,7 +274,7 @@ void remove_style_text_area_axis_value(lv_obj_t *obj) {
 void init_style_active_tool_and_space_MAIN_DEFAULT(lv_style_t *style) {
     lv_style_set_min_height(style, 60);
     lv_style_set_max_height(style, 60);
-    lv_style_set_text_color(style, lv_color_hex(0xfff9f600));
+    lv_style_set_text_color(style, lv_color_hex(0xf9f600));
     lv_style_set_text_font(style, &lv_font_montserrat_40);
     lv_style_set_min_width(style, 100);
 };
@@ -303,7 +305,7 @@ void remove_style_active_tool_and_space(lv_obj_t *obj) {
 //
 
 void init_style_setting_page_label_MAIN_DEFAULT(lv_style_t *style) {
-    lv_style_set_text_color(style, lv_color_hex(0xfff9f600));
+    lv_style_set_text_color(style, lv_color_hex(0xf9f600));
     lv_style_set_text_font(style, &lv_font_montserrat_32);
 };
 
