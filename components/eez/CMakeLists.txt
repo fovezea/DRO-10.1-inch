@@ -10,6 +10,8 @@ idf_component_register(
         "generated/images.c"
         "e_screw_screen.c"
         "dro_axis_helper.c"
+        "fonts/ui_font_jet_prains_mono_bold48.c"
+        "fonts/ui_font_jet_brains_mono_bold_64.c"
 
     INCLUDE_DIRS 
         "."

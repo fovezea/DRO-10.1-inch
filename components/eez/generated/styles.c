@@ -11,7 +11,7 @@
 
 void init_style_label_axis_MAIN_DEFAULT(lv_style_t *style) {
     lv_style_set_text_color(style, lv_color_hex(0xfff9f600));
-    lv_style_set_text_font(style, &lv_font_montserrat_48);
+    lv_style_set_text_font(style, &ui_font_jet_brains_mono_bold_64);
     lv_style_set_text_align(style, LV_TEXT_ALIGN_CENTER);
     lv_style_set_align(style, LV_ALIGN_DEFAULT);
     lv_style_set_min_width(style, 50);
@@ -223,7 +223,7 @@ void init_style_text_area_axis_value_MAIN_DEFAULT(lv_style_t *style) {
     lv_style_set_max_height(style, 80);
     lv_style_set_min_width(style, 290);
     lv_style_set_text_color(style, lv_color_hex(0xfff9f600));
-    lv_style_set_text_font(style, &lv_font_montserrat_48);
+    lv_style_set_text_font(style, &ui_font_jet_brains_mono_bold_64);
     lv_style_set_text_align(style, LV_TEXT_ALIGN_RIGHT);
     lv_style_set_pad_right(style, 10);
 };

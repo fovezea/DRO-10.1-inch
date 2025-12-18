@@ -31,7 +31,11 @@ typedef struct {
 } cmd_item_t;
 
 // State Store
-static fpga_state_t g_fpga_state = {0};
+static fpga_state_t g_fpga_state = {
+    .is_connected = true, // MOCK: Assume connected for UI development
+    .current_rpm = 0,
+    .work_mode = 0
+};
 static SemaphoreHandle_t g_state_mutex = NULL;
 static QueueHandle_t g_cmd_queue = NULL;
 

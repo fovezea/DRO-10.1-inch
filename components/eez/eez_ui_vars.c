@@ -1,5 +1,7 @@
 #include "generated/vars.h"
 #include "dro_core.h"
+#include "fpga_comms.h"
+#include <stdio.h>
 #include <string.h>
 
 // Global variable storage
@@ -73,4 +75,15 @@ void set_var_active_space_number(int32_t value) {
 
 int get_var_axis_precision() {
     return dro_get_precision();
+}
+
+const char* get_var_mode_text() {
+    const dro_system_state_t* state = dro_get_state();
+    return (state->current_mode == DRO_MODE_ABS) ? "ABSOLUTE" : "INCREMENTAL";
+}
+
+const char* get_var_conn_status_text() {
+    fpga_state_t state;
+    fpga_comms_get_state(&state);
+    return state.is_connected ? "CONNECTED" : "DISCONNECTED";
 }

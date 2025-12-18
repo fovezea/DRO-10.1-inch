@@ -559,16 +559,29 @@ void create_screen_main() {
                             add_style_text_area_axis_value(obj);
                         }
                         {
-                            // info_text_area
+                            // Status bar labels
+                            objects.mode_status_label = lv_label_create(parent_obj);
+                            lv_obj_set_pos(objects.mode_status_label, 807, 10);
+                            lv_obj_set_style_text_font(objects.mode_status_label, &lv_font_montserrat_22, 0);
+                            lv_obj_set_style_text_color(objects.mode_status_label, lv_color_hex(0xfff9f600), 0);
+                            lv_label_set_text(objects.mode_status_label, "ABSOLUTE");
+
+                            objects.conn_status_label = lv_label_create(parent_obj);
+                            lv_obj_set_pos(objects.conn_status_label, 1020, 10);
+                            lv_obj_set_style_text_font(objects.conn_status_label, &lv_font_montserrat_22, 0);
+                            lv_obj_set_style_text_color(objects.conn_status_label, lv_color_hex(0xfff9f600), 0);
+                            lv_label_set_text(objects.conn_status_label, "DISCONNECTED");
+
+                            // info_text_area (Input field)
                             lv_obj_t *obj = lv_textarea_create(parent_obj);
                             objects.info_text_area = obj;
-                            lv_obj_set_pos(obj, 797, -5);
-                            lv_obj_set_size(obj, 442, 97);
+                            lv_obj_set_pos(obj, 797, 125);
+                            lv_obj_set_size(obj, 442, 55);
                             lv_textarea_set_max_length(obj, 128);
-                            lv_textarea_set_one_line(obj, false);
+                            lv_textarea_set_one_line(obj, true);
                             lv_textarea_set_password_mode(obj, false);
-                            lv_obj_set_style_min_height(obj, 180, LV_PART_MAIN | LV_STATE_DEFAULT);
-                            lv_obj_set_style_max_height(obj, 180, LV_PART_MAIN | LV_STATE_DEFAULT);
+                            lv_obj_set_style_text_font(obj, &lv_font_montserrat_32, 0);
+                            lv_obj_set_style_text_align(obj, LV_TEXT_ALIGN_RIGHT, 0);
                         }
                         {
                             // Axis1_textarea
@@ -581,7 +594,6 @@ void create_screen_main() {
                             lv_textarea_set_one_line(obj, true);
                             lv_textarea_set_password_mode(obj, false);
                             lv_obj_add_event_cb(obj, event_handler_cb_main_axis1_textarea, LV_EVENT_ALL, 0);
-                            lv_obj_add_state(obj, LV_STATE_FOCUSED);
                             add_style_text_area_axis_value(obj);
                         }
                         {
@@ -751,6 +763,14 @@ void create_screen_main() {
 }
 
 void tick_screen_main() {
+    // Update status labels
+    if (objects.mode_status_label) {
+        lv_label_set_text(objects.mode_status_label, get_var_mode_text());
+    }
+    if (objects.conn_status_label) {
+        lv_label_set_text(objects.conn_status_label, get_var_conn_status_text());
+    }
+
     // Update E-Screw screen
     tick_e_screw_screen();
     

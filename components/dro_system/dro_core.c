@@ -28,8 +28,6 @@ esp_err_t dro_init(void) {
     // Load Axis States
     for (int i = 0; i < DRO_AXIS_COUNT; i++) {
         system_state.axes[i].raw_position = 0.0f; // Reset on boot
-        // tool_offset will be set by dro_tool_apply below
-        dro_nvs_load_axis_offset(i, &system_state.axes[i].work_offset);
     }
 
     // Load and Apply Active Tool
@@ -40,6 +38,8 @@ esp_err_t dro_init(void) {
     // Load and Apply Active Workspace (Space)
     int32_t active_space_idx = 0;
     dro_nvs_load_param(DRO_KEY_SPACE, &active_space_idx, 0);
+    dro_workspace_apply(active_space_idx);
+
     // Initial precision settings
     system_state.high_precision = false;
 

@@ -7,8 +7,8 @@
 extern "C" {
 #endif
 
-LV_FONT_DECLARE(ui_font_jet_prains_mono_bold);
-LV_FONT_DECLARE(ui_font_jet_brains_mono_bold_64);
+extern const lv_font_t ui_font_jet_prains_mono_bold;
+
 
 #ifdef __cplusplus
 }

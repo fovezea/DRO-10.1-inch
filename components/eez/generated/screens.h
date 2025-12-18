@@ -57,6 +57,8 @@ typedef struct _objects_t {
     lv_obj_t *axis5_tab;
     lv_obj_t *general_settings_tab;
     lv_obj_t *settings_mm_switch;
+    lv_obj_t *mode_status_label;
+    lv_obj_t *conn_status_label;
 } objects_t;
 
 extern objects_t objects;
