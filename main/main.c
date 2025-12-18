@@ -485,13 +485,9 @@ static void dro_update_task(void *pvParameters)
             
             // Optional: Update ABS/INC button label if it existed as a label, but it's a toggle button usually
             
-            // Update Active Tool Display via variable setter (EEZ UI handles the sync safely)
+            // Update Active Tool and Space Displays via variable setters (EEZ UI handles the sync)
             set_var_active_tool_number(state->active_tool_index);
-            
-            // Note: Space number also uses the 200 placeholder in UI, 
-            // but we don't have a backend variable for it yet in dro_system.
-            // For now, let's just ensure it's initialized to 0 in the UI too.
-            set_var_active_space_number(0);
+            set_var_active_space_number(state->active_space_index);
         }
         
         lvgl_port_unlock();

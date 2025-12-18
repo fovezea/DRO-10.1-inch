@@ -4,7 +4,7 @@
 #include "esp_log.h"
 #include "dro_core.h" // For AXIS_COUNT
 
-static const char *TAG = "DRO_NVS";
+// No TAG needed for now as there are no log calls in this file
 
 esp_err_t dro_nvs_init(void) {
     esp_err_t err = nvs_flash_init();
@@ -114,6 +114,36 @@ esp_err_t dro_nvs_load_tool(uint8_t tool_index, void* data, size_t size) {
     nvs_handle_t handle;
     esp_err_t err = dro_nvs_open(&handle, NVS_READONLY);
     if (err != ESP_OK) return err; // Caller handles empty/default
+
+    size_t required_size = size;
+    err = nvs_get_blob(handle, key, data, &required_size);
+    nvs_close(handle);
+    return err;
+}
+
+esp_err_t dro_nvs_save_workspace(uint8_t space_index, const void* data, size_t size) {
+    char key[16];
+    snprintf(key, sizeof(key), "spc_%d", space_index);
+    
+    nvs_handle_t handle;
+    esp_err_t err = dro_nvs_open(&handle, NVS_READWRITE);
+    if (err != ESP_OK) return err;
+
+    err = nvs_set_blob(handle, key, data, size);
+    if (err == ESP_OK) {
+        err = nvs_commit(handle);
+    }
+    nvs_close(handle);
+    return err;
+}
+
+esp_err_t dro_nvs_load_workspace(uint8_t space_index, void* data, size_t size) {
+    char key[16];
+    snprintf(key, sizeof(key), "spc_%d", space_index);
+
+    nvs_handle_t handle;
+    esp_err_t err = dro_nvs_open(&handle, NVS_READONLY);
+    if (err != ESP_OK) return err;
 
     size_t required_size = size;
     err = nvs_get_blob(handle, key, data, &required_size);

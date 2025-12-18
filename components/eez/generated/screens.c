@@ -95,7 +95,7 @@ static void event_handler_cb_main_axis2_textarea(lv_event_t *e) {
 static void tab_button_event_handler(lv_event_t *e) {
     lv_event_code_t event = lv_event_get_code(e);
     if (event == LV_EVENT_CLICKED) {
-        lv_obj_t *button = lv_event_get_target(e);
+        // lv_obj_t *button = lv_event_get_target(e); // Unused
         uint32_t tab_index = (uint32_t)lv_event_get_user_data(e);
         
         // Manually switch to the selected tab
@@ -783,7 +783,7 @@ void tick_screen_main() {
     {
         if (objects.axis4_textarea) {
             char new_val_str[32];
-            snprintf(new_val_str, sizeof(new_val_str), "%.4f", get_var_virtual_axis_4());
+            snprintf(new_val_str, sizeof(new_val_str), "%.*f", get_var_axis_precision(), get_var_virtual_axis_4());
             const char *cur_val = lv_textarea_get_text(objects.axis4_textarea);
             uint32_t max_length = lv_textarea_get_max_length(objects.axis4_textarea);
             if (cur_val && strncmp(new_val_str, cur_val, max_length) != 0) {
@@ -796,7 +796,7 @@ void tick_screen_main() {
     {
         if (objects.axis1_textarea) {
             char new_val_str[32];
-            snprintf(new_val_str, sizeof(new_val_str), "%.4f", get_var_virtual_axis_1());
+            snprintf(new_val_str, sizeof(new_val_str), "%.*f", get_var_axis_precision(), get_var_virtual_axis_1());
             const char *cur_val = lv_textarea_get_text(objects.axis1_textarea);
             uint32_t max_length = lv_textarea_get_max_length(objects.axis1_textarea);
             if (cur_val && strncmp(new_val_str, cur_val, max_length) != 0) {
@@ -809,7 +809,7 @@ void tick_screen_main() {
     {
         if (objects.axis3_textarea) {
             char new_val_str[32];
-            snprintf(new_val_str, sizeof(new_val_str), "%.4f", get_var_virtual_axis_3());
+            snprintf(new_val_str, sizeof(new_val_str), "%.*f", get_var_axis_precision(), get_var_virtual_axis_3());
             const char *cur_val = lv_textarea_get_text(objects.axis3_textarea);
             uint32_t max_length = lv_textarea_get_max_length(objects.axis3_textarea);
             if (cur_val && strncmp(new_val_str, cur_val, max_length) != 0) {
@@ -822,7 +822,7 @@ void tick_screen_main() {
     {
         if (objects.axis5_textarea) {
             char new_val_str[32];
-            snprintf(new_val_str, sizeof(new_val_str), "%.4f", get_var_virtual_axis_5());
+            snprintf(new_val_str, sizeof(new_val_str), "%.*f", get_var_axis_precision(), get_var_virtual_axis_5());
             const char *cur_val = lv_textarea_get_text(objects.axis5_textarea);
             uint32_t max_length = lv_textarea_get_max_length(objects.axis5_textarea);
             if (cur_val && strncmp(new_val_str, cur_val, max_length) != 0) {
@@ -835,7 +835,7 @@ void tick_screen_main() {
     {
         if (objects.axis2_textarea) {
             char new_val_str[32];
-            snprintf(new_val_str, sizeof(new_val_str), "%.4f", get_var_virtual_axis_2());
+            snprintf(new_val_str, sizeof(new_val_str), "%.*f", get_var_axis_precision(), get_var_virtual_axis_2());
             const char *cur_val = lv_textarea_get_text(objects.axis2_textarea);
             uint32_t max_length = lv_textarea_get_max_length(objects.axis2_textarea);
             if (cur_val && strncmp(new_val_str, cur_val, max_length) != 0) {
@@ -847,7 +847,7 @@ void tick_screen_main() {
     }
     {
         char new_val_str[32];
-        snprintf(new_val_str, sizeof(new_val_str), "%.4f", get_var_virtual_axis_3());
+        snprintf(new_val_str, sizeof(new_val_str), "%.*f", get_var_axis_precision(), get_var_virtual_axis_3());
         const char *cur_val = lv_textarea_get_text(objects.axis3_textarea);
         uint32_t max_length = lv_textarea_get_max_length(objects.axis3_textarea);
         if (strncmp(new_val_str, cur_val, max_length) != 0) {
@@ -858,7 +858,7 @@ void tick_screen_main() {
     }
     {
         char new_val_str[32];
-        snprintf(new_val_str, sizeof(new_val_str), "%.4f", get_var_virtual_axis_5());
+        snprintf(new_val_str, sizeof(new_val_str), "%.*f", get_var_axis_precision(), get_var_virtual_axis_5());
         const char *cur_val = lv_textarea_get_text(objects.axis5_textarea);
         uint32_t max_length = lv_textarea_get_max_length(objects.axis5_textarea);
         if (strncmp(new_val_str, cur_val, max_length) != 0) {
@@ -869,7 +869,7 @@ void tick_screen_main() {
     }
     {
         char new_val_str[32];
-        snprintf(new_val_str, sizeof(new_val_str), "%.4f", get_var_virtual_axis_2());
+        snprintf(new_val_str, sizeof(new_val_str), "%.*f", get_var_axis_precision(), get_var_virtual_axis_2());
         const char *cur_val = lv_textarea_get_text(objects.axis2_textarea);
         uint32_t max_length = lv_textarea_get_max_length(objects.axis2_textarea);
         if (strncmp(new_val_str, cur_val, max_length) != 0) {

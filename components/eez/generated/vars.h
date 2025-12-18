@@ -40,6 +40,7 @@ extern int32_t get_var_active_tool_number();
 extern void set_var_active_tool_number(int32_t value);
 extern int32_t get_var_active_space_number();
 extern void set_var_active_space_number(int32_t value);
+extern int get_var_axis_precision();
 
 
 #ifdef __cplusplus

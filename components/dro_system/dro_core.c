@@ -35,8 +35,13 @@ esp_err_t dro_init(void) {
     // Load and Apply Active Tool
     int32_t active_tool_idx = 0;
     dro_nvs_load_param(DRO_KEY_TOOL, &active_tool_idx, 0);
-    // Apply tool (this updates tool_offset for all axes)
     dro_tool_apply(active_tool_idx);
+
+    // Load and Apply Active Workspace (Space)
+    int32_t active_space_idx = 0;
+    dro_nvs_load_param(DRO_KEY_SPACE, &active_space_idx, 0);
+    // Initial precision settings
+    system_state.high_precision = false;
 
     system_state.is_initialized = true;
     ESP_LOGI(TAG, "DRO System Initialized. Units: %d, Mode: %d", system_state.current_unit, system_state.current_mode);
@@ -45,6 +50,14 @@ esp_err_t dro_init(void) {
 
 const dro_system_state_t* dro_get_state(void) {
     return &system_state;
+}
+
+int dro_get_precision(void) {
+    if (system_state.current_unit == DRO_UNIT_MM) {
+        return system_state.high_precision ? 4 : 3;
+    } else {
+        return system_state.high_precision ? 5 : 4;
+    }
 }
 
 void dro_update(void) {
@@ -118,8 +131,14 @@ void dro_axis_zero(uint8_t axis_index) {
     float new_offset = system_state.axes[axis_index].raw_position - system_state.axes[axis_index].tool_offset;
     system_state.axes[axis_index].work_offset = new_offset;
     
-    dro_nvs_save_axis_offset(axis_index, new_offset);
-    ESP_LOGI(TAG, "Axis %d Zeroed. New Offset: %f", axis_index, new_offset);
+    // Save to active workspace
+    dro_workspace_t space;
+    if (dro_workspace_get(system_state.active_space_index, &space) == ESP_OK) {
+        space.offsets[axis_index] = new_offset;
+        dro_workspace_set(system_state.active_space_index, &space);
+    }
+
+    ESP_LOGI(TAG, "Axis %d Zeroed in Space %ld. New Offset: %f", axis_index, (long)system_state.active_space_index, new_offset);
     
     // Force mode to INC so they see the Zero? 
     // Or just leave it? Usually DROs switch to INC or stay in INC.
@@ -145,7 +164,13 @@ void dro_axis_set_value(uint8_t axis_index, float value) {
                        value_mm;
 
     system_state.axes[axis_index].work_offset = new_offset;
-    dro_nvs_save_axis_offset(axis_index, new_offset);
+    
+    // Save to active workspace
+    dro_workspace_t space;
+    if (dro_workspace_get(system_state.active_space_index, &space) == ESP_OK) {
+        space.offsets[axis_index] = new_offset;
+        dro_workspace_set(system_state.active_space_index, &space);
+    }
     
     if (system_state.current_mode == DRO_MODE_ABS) {
         dro_toggle_mode(); // Switch to INC
@@ -173,7 +198,13 @@ void dro_axis_half(uint8_t axis_index) {
                        target_mm;
                        
     system_state.axes[axis_index].work_offset = new_offset;
-    dro_nvs_save_axis_offset(axis_index, new_offset);
+    
+    // Save to active workspace
+    dro_workspace_t space;
+    if (dro_workspace_get(system_state.active_space_index, &space) == ESP_OK) {
+        space.offsets[axis_index] = new_offset;
+        dro_workspace_set(system_state.active_space_index, &space);
+    }
     
     if (system_state.current_mode == DRO_MODE_ABS) {
         dro_toggle_mode();
@@ -221,4 +252,46 @@ esp_err_t dro_tool_apply(int32_t tool_index) {
 
 int32_t dro_tool_get_active_index(void) {
     return system_state.active_tool_index;
+}
+
+esp_err_t dro_workspace_get(uint8_t space_index, dro_workspace_t* space_out) {
+    if (space_index >= DRO_MAX_WORKSPACES || !space_out) return ESP_ERR_INVALID_ARG;
+    
+    esp_err_t err = dro_nvs_load_workspace(space_index, space_out, sizeof(dro_workspace_t));
+    if (err == ESP_ERR_NVS_NOT_FOUND) {
+        memset(space_out, 0, sizeof(dro_workspace_t));
+        snprintf(space_out->name, sizeof(space_out->name), "Space %d", space_index);
+        return ESP_OK;
+    }
+    return err;
+}
+
+esp_err_t dro_workspace_set(uint8_t space_index, const dro_workspace_t* space_in) {
+    if (space_index >= DRO_MAX_WORKSPACES || !space_in) return ESP_ERR_INVALID_ARG;
+    return dro_nvs_save_workspace(space_index, space_in, sizeof(dro_workspace_t));
+}
+
+esp_err_t dro_workspace_apply(int32_t space_index) {
+    if (space_index < 0 || space_index >= DRO_MAX_WORKSPACES) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    dro_workspace_t space;
+    esp_err_t err = dro_workspace_get((uint8_t)space_index, &space);
+    if (err != ESP_OK) return err;
+
+    // Apply offsets to all live axis states
+    for (int i = 0; i < DRO_AXIS_COUNT; i++) {
+        system_state.axes[i].work_offset = space.offsets[i];
+    }
+    
+    system_state.active_space_index = space_index;
+    dro_nvs_save_param(DRO_KEY_SPACE, space_index);
+    
+    ESP_LOGI(TAG, "Applied Workspace %ld: %s", (long)space_index, space.name);
+    return ESP_OK;
+}
+
+int32_t dro_workspace_get_active_index(void) {
+    return system_state.active_space_index;
 }

@@ -1,4 +1,5 @@
 #include "generated/vars.h"
+#include "dro_core.h"
 #include <string.h>
 
 // Global variable storage
@@ -68,4 +69,8 @@ void set_var_active_tool_number(int32_t value) {
 
 void set_var_active_space_number(int32_t value) {
     active_space_number = value;
+}
+
+int get_var_axis_precision() {
+    return dro_get_precision();
 }

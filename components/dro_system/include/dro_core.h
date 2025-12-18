@@ -17,6 +17,7 @@ extern "C" {
 #define DRO_AXIS_C 4
 
 #define DRO_MAX_TOOLS 200
+#define DRO_MAX_WORKSPACES 200
 
 typedef enum {
     DRO_UNIT_MM = 0,
@@ -42,10 +43,17 @@ typedef struct {
 } dro_tool_t;
 
 typedef struct {
+    char name[16];
+    float offsets[DRO_AXIS_COUNT];
+} dro_workspace_t;
+
+typedef struct {
     dro_unit_t current_unit;
     dro_mode_t current_mode;
     dro_axis_state_t axes[DRO_AXIS_COUNT];
     int32_t active_tool_index;
+    int32_t active_space_index;
+    bool high_precision;
     bool is_initialized;
 } dro_system_state_t;
 
@@ -53,6 +61,11 @@ typedef struct {
  * @brief Initialize the DRO system and load state from NVS
  */
 esp_err_t dro_init(void);
+
+/**
+ * @brief Get current decimal precision based on units and settings
+ */
+int dro_get_precision(void);
 
 /**
  * @brief Main tick function to calculate positions
@@ -123,6 +136,29 @@ esp_err_t dro_tool_apply(int32_t tool_index);
  * @brief Get the currently active tool index
  */
 int32_t dro_tool_get_active_index(void);
+
+
+// --- Workspace Management ---
+
+/**
+ * @brief Get workspace data from NVS
+ */
+esp_err_t dro_workspace_get(uint8_t space_index, dro_workspace_t* space_out);
+
+/**
+ * @brief Save workspace data to NVS
+ */
+esp_err_t dro_workspace_set(uint8_t space_index, const dro_workspace_t* space_in);
+
+/**
+ * @brief Apply a workspace's offsets to the current system
+ */
+esp_err_t dro_workspace_apply(int32_t space_index);
+
+/**
+ * @brief Get the currently active workspace index
+ */
+int32_t dro_workspace_get_active_index(void);
 
 
 #ifdef __cplusplus

@@ -136,8 +136,8 @@ static void event_numpad_ready(lv_event_t * e) {
         case INPUT_MODE_SPACE_INDEX:
             {
                 int32_t space_idx = atoi(txt);
-                // Placeholder: No backend logic for space yet
-                ESP_LOGI(TAG, "Applied Space %ld (Placeholder)", (long)space_idx);
+                dro_workspace_apply(space_idx);
+                ESP_LOGI(TAG, "Applied Space %ld", (long)space_idx);
             }
             break;
             
