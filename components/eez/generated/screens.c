@@ -119,7 +119,7 @@ void create_screen_main() {
             lv_obj_set_size(obj, 1280, 800);
             lv_tabview_set_tab_bar_position(obj, LV_DIR_TOP);
             lv_tabview_set_tab_bar_size(obj, 60);
-            lv_obj_set_style_text_color(obj, lv_color_hex(0xfff9f600), LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_text_color(obj, lv_color_hex(0xf9f600), LV_PART_MAIN | LV_STATE_DEFAULT);
             // Enable clickable tabs and ensure proper touch handling
             lv_obj_add_flag(obj, LV_OBJ_FLAG_CLICKABLE);
             lv_obj_add_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
@@ -136,7 +136,7 @@ void create_screen_main() {
                     lv_obj_t *obj = lv_tabview_add_tab(parent_obj, "DRO");
                     objects.dro_tab = obj;
                     add_style_tab_style(obj);
-                    lv_obj_set_style_text_color(obj, lv_color_hex(0xfff9f600), LV_PART_MAIN | LV_STATE_DEFAULT);
+                    lv_obj_set_style_text_color(obj, lv_color_hex(0xf9f600), LV_PART_MAIN | LV_STATE_DEFAULT);
                     
                     // Get the tab button and add explicit event handler
                     lv_obj_t *tab_bar = lv_tabview_get_tab_bar(objects.obj0);
@@ -341,7 +341,7 @@ void create_screen_main() {
                             // mm_X_axis5_label
                             lv_obj_t *obj = lv_label_create(parent_obj);
                             objects.mm_x_axis5_label = obj;
-                            lv_obj_set_pos(obj, 387, 534);
+                            lv_obj_set_pos(obj, 417, 534);
                             lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
                             add_style_label_mm(obj);
                             lv_label_set_text(obj, "mm");
@@ -350,7 +350,7 @@ void create_screen_main() {
                             // mm_X_axis4_label
                             lv_obj_t *obj = lv_label_create(parent_obj);
                             objects.mm_x_axis4_label = obj;
-                            lv_obj_set_pos(obj, 387, 418);
+                            lv_obj_set_pos(obj, 417, 418);
                             lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
                             add_style_label_mm(obj);
                             lv_label_set_text(obj, "mm");
@@ -359,7 +359,7 @@ void create_screen_main() {
                             // mm_X_axis3_label
                             lv_obj_t *obj = lv_label_create(parent_obj);
                             objects.mm_x_axis3_label = obj;
-                            lv_obj_set_pos(obj, 387, 302);
+                            lv_obj_set_pos(obj, 417, 302);
                             lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
                             add_style_label_mm(obj);
                             lv_label_set_text(obj, "mm");
@@ -368,7 +368,7 @@ void create_screen_main() {
                             // mm_X_axis1_label
                             lv_obj_t *obj = lv_label_create(parent_obj);
                             objects.mm_x_axis1_label = obj;
-                            lv_obj_set_pos(obj, 387, 70);
+                            lv_obj_set_pos(obj, 417, 70);
                             lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
                             add_style_label_mm(obj);
                             lv_label_set_text(obj, "mm");
@@ -540,7 +540,7 @@ void create_screen_main() {
                             // mm_X_axis2_label
                             lv_obj_t *obj = lv_label_create(parent_obj);
                             objects.mm_x_axis2_label = obj;
-                            lv_obj_set_pos(obj, 387, 186);
+                            lv_obj_set_pos(obj, 417, 186);
                             lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
                             add_style_label_mm(obj);
                             lv_label_set_text(obj, "mm");
@@ -549,8 +549,8 @@ void create_screen_main() {
                             // Axis4_textarea
                             lv_obj_t *obj = lv_textarea_create(parent_obj);
                             objects.axis4_textarea = obj;
-                            lv_obj_set_pos(obj, 78, 378);
-                            lv_obj_set_size(obj, 290, 80);
+                            lv_obj_set_pos(obj, 70, 378);
+                            lv_obj_set_size(obj, 335, 80);
                             lv_textarea_set_max_length(obj, 9);
                             lv_textarea_set_placeholder_text(obj, "8888.0000");
                             lv_textarea_set_one_line(obj, true);
@@ -587,8 +587,8 @@ void create_screen_main() {
                             // Axis1_textarea
                             lv_obj_t *obj = lv_textarea_create(parent_obj);
                             objects.axis1_textarea = obj;
-                            lv_obj_set_pos(obj, 78, 30);
-                            lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+                            lv_obj_set_pos(obj, 70, 30);
+                            lv_obj_set_size(obj, 335, 80);
                             lv_textarea_set_max_length(obj, 9);
                             lv_textarea_set_placeholder_text(obj, "8888.0000");
                             lv_textarea_set_one_line(obj, true);
@@ -600,8 +600,8 @@ void create_screen_main() {
                             // Axis3_textarea
                             lv_obj_t *obj = lv_textarea_create(parent_obj);
                             objects.axis3_textarea = obj;
-                            lv_obj_set_pos(obj, 78, 262);
-                            lv_obj_set_size(obj, 290, 80);
+                            lv_obj_set_pos(obj, 70, 262);
+                            lv_obj_set_size(obj, 335, 80);
                             lv_textarea_set_max_length(obj, 9);
                             lv_textarea_set_placeholder_text(obj, "8888.0000");
                             lv_textarea_set_one_line(obj, true);
@@ -613,8 +613,8 @@ void create_screen_main() {
                             // Axis5_textarea
                             lv_obj_t *obj = lv_textarea_create(parent_obj);
                             objects.axis5_textarea = obj;
-                            lv_obj_set_pos(obj, 78, 494);
-                            lv_obj_set_size(obj, 290, 80);
+                            lv_obj_set_pos(obj, 70, 494);
+                            lv_obj_set_size(obj, 335, 80);
                             lv_textarea_set_max_length(obj, 9);
                             lv_textarea_set_placeholder_text(obj, "8888.0000");
                             lv_textarea_set_one_line(obj, true);
@@ -626,8 +626,8 @@ void create_screen_main() {
                             // Axis2_textarea
                             lv_obj_t *obj = lv_textarea_create(parent_obj);
                             objects.axis2_textarea = obj;
-                            lv_obj_set_pos(obj, 78, 146);
-                            lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+                            lv_obj_set_pos(obj, 70, 146);
+                            lv_obj_set_size(obj, 335, 80);
                             lv_textarea_set_max_length(obj, 9);
                             lv_textarea_set_placeholder_text(obj, "8888.8888");
                             lv_textarea_set_one_line(obj, true);
@@ -695,7 +695,7 @@ void create_screen_main() {
                     // Tab 2
                     lv_obj_t *obj = lv_tabview_add_tab(parent_obj, "Tab 2");
                     add_style_tab_style(obj);
-                    lv_obj_set_style_text_color(obj, lv_color_hex(0xfff9f600), LV_PART_MAIN | LV_STATE_DEFAULT);
+                    lv_obj_set_style_text_color(obj, lv_color_hex(0xf9f600), LV_PART_MAIN | LV_STATE_DEFAULT);
                     
                     // Get the tab button and add explicit event handler
                     lv_obj_t *tab_bar = lv_tabview_get_tab_bar(objects.obj0);
@@ -719,7 +719,7 @@ void create_screen_main() {
                     // Tab 3
                     lv_obj_t *obj = lv_tabview_add_tab(parent_obj, "Tab 3");
                     add_style_tab_style(obj);
-                    lv_obj_set_style_text_color(obj, lv_color_hex(0xfff9f600), LV_PART_MAIN | LV_STATE_DEFAULT);
+                    lv_obj_set_style_text_color(obj, lv_color_hex(0xf9f600), LV_PART_MAIN | LV_STATE_DEFAULT);
                     
                     // Get the tab button and add explicit event handler
                     lv_obj_t *tab_bar = lv_tabview_get_tab_bar(objects.obj0);
@@ -743,7 +743,7 @@ void create_screen_main() {
                     // E-Screw Tab
                     lv_obj_t *obj = lv_tabview_add_tab(parent_obj, "E-Screw");
                     add_style_tab_style(obj);
-                    lv_obj_set_style_text_color(obj, lv_color_hex(0xfff9f600), LV_PART_MAIN | LV_STATE_DEFAULT);
+                    lv_obj_set_style_text_color(obj, lv_color_hex(0xf9f600), LV_PART_MAIN | LV_STATE_DEFAULT);
                     
                     // Get the tab button and add explicit event handler
                     lv_obj_t *tab_bar = lv_tabview_get_tab_bar(objects.obj0);
@@ -915,7 +915,7 @@ void create_screen_setings_page() {
             lv_obj_set_size(obj, 1280, 800);
             lv_tabview_set_tab_bar_position(obj, LV_DIR_TOP);
             lv_tabview_set_tab_bar_size(obj, 60);
-            lv_obj_set_style_text_color(obj, lv_color_hex(0xfff9f600), LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_text_color(obj, lv_color_hex(0xf9f600), LV_PART_MAIN | LV_STATE_DEFAULT);
             {
                 lv_obj_t *parent_obj = obj;
                 {
