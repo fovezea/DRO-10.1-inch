@@ -48,6 +48,9 @@ static void wifi_init_task(void *pvParameters);
 
 // Forward declaration for UI tick task
 static void ui_tick_task(void *pvParameters);
+static void dro_update_task(void *pvParameters);
+#include "dro_core.h"
+#include "vars.h" // For set_var_virtual_axis_X
 
 static const char *TAG = "WIFI_DEBUG";
 
@@ -295,6 +298,10 @@ static void ui_creation_task(void *pvParameters)
     // Initialize DRO axis helpers after screens are created
     dro_axis_helper_init();
     
+    // Initialize UI Events mappings (must be after ui_init)
+    extern void dro_ui_events_init(void);
+    dro_ui_events_init();
+    
     // UI creation complete
     ESP_LOGI(TAG, "UI creation complete");
     
@@ -361,8 +368,11 @@ static esp_err_t app_display_init(void)
             ESP_LOGE(TAG, "Failed to turn on display backlight: %s", esp_err_to_name(backlight_ret));
         }
         
+        // Lock LVGL for thread safety if the port is running
+        lvgl_port_lock(0);
         // Set initial rotation to 270° landscape
         lv_display_set_rotation(lvgl_disp, LV_DISPLAY_ROTATION_270);
+        lvgl_port_unlock();
         
         ESP_LOGI(TAG, "Display initialized with LVGL software rotation");
         return ESP_OK;
@@ -429,6 +439,65 @@ void app_main(void)
     
     // Create delayed WiFi initialization task with slave device health checks
     xTaskCreate(wifi_init_task, "wifi_init", 4096, NULL, 2, NULL);
+
+    // Initialize DRO System
+    if (dro_init() == ESP_OK) {
+        ESP_LOGI(TAG, "DRO System Initialized");
+    } else {
+        ESP_LOGE(TAG, "DRO System Init Failed");
+    }
+
+
+    // Create DRO Update Task
+    xTaskCreate(dro_update_task, "dro_update", 4096, NULL, 5, NULL);
+}
+
+/**
+ * @brief Task to update DRO state and UI
+ */
+static void dro_update_task(void *pvParameters)
+{
+    // Wait for UI to be ready
+    vTaskDelay(pdMS_TO_TICKS(2000));
+
+    while (1) {
+        // Update DRO Internal State
+        dro_update();
+
+        // Update UI Variables (Thread Safe)
+        lvgl_port_lock(0);
+        
+        const dro_system_state_t* state = dro_get_state();
+        if (state && state->is_initialized) {
+            set_var_virtual_axis_1(state->axes[DRO_AXIS_X].displayed_value);
+            set_var_virtual_axis_2(state->axes[DRO_AXIS_Y].displayed_value);
+            set_var_virtual_axis_3(state->axes[DRO_AXIS_Z].displayed_value);
+            set_var_virtual_axis_4(state->axes[DRO_AXIS_W].displayed_value);
+            set_var_virtual_axis_5(state->axes[DRO_AXIS_C].displayed_value);
+        
+            // Update Unit Labels
+            const char* unit_str = (state->current_unit == DRO_UNIT_MM) ? "mm" : "in";
+            if (objects.mm_x_axis1_label) lv_label_set_text(objects.mm_x_axis1_label, unit_str);
+            if (objects.mm_x_axis2_label) lv_label_set_text(objects.mm_x_axis2_label, unit_str);
+            if (objects.mm_x_axis3_label) lv_label_set_text(objects.mm_x_axis3_label, unit_str);
+            if (objects.mm_x_axis4_label) lv_label_set_text(objects.mm_x_axis4_label, unit_str);
+            if (objects.mm_x_axis5_label) lv_label_set_text(objects.mm_x_axis5_label, unit_str);
+            
+            // Optional: Update ABS/INC button label if it existed as a label, but it's a toggle button usually
+            
+            // Update Active Tool Display via variable setter (EEZ UI handles the sync safely)
+            set_var_active_tool_number(state->active_tool_index);
+            
+            // Note: Space number also uses the 200 placeholder in UI, 
+            // but we don't have a backend variable for it yet in dro_system.
+            // For now, let's just ensure it's initialized to 0 in the UI too.
+            set_var_active_space_number(0);
+        }
+        
+        lvgl_port_unlock();
+
+        vTaskDelay(pdMS_TO_TICKS(20)); // 50Hz update rate
+    }
 }
 
 /**

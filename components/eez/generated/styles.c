@@ -254,6 +254,7 @@ lv_style_t *get_style_text_area_axis_value_SELECTED_FOCUSED() {
 void add_style_text_area_axis_value(lv_obj_t *obj) {
     (void)obj;
     lv_obj_add_style(obj, get_style_text_area_axis_value_MAIN_DEFAULT(), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_add_style(obj, get_style_text_area_axis_value_MAIN_DEFAULT(), LV_PART_TEXTAREA_PLACEHOLDER | LV_STATE_DEFAULT);
     lv_obj_add_style(obj, get_style_text_area_axis_value_SELECTED_FOCUSED(), LV_PART_SELECTED | LV_STATE_FOCUSED);
 };
 
@@ -288,6 +289,7 @@ lv_style_t *get_style_active_tool_and_space_MAIN_DEFAULT() {
 void add_style_active_tool_and_space(lv_obj_t *obj) {
     (void)obj;
     lv_obj_add_style(obj, get_style_active_tool_and_space_MAIN_DEFAULT(), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_add_style(obj, get_style_active_tool_and_space_MAIN_DEFAULT(), LV_PART_TEXTAREA_PLACEHOLDER | LV_STATE_DEFAULT);
 };
 
 void remove_style_active_tool_and_space(lv_obj_t *obj) {

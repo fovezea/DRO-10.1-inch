@@ -24,6 +24,7 @@ idf_component_register(
         screw_calc
         cone_calc
         axis_mapping
+        dro_system
 )
 
 # Add EEZ Studio generated files

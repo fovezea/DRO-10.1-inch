@@ -747,7 +747,7 @@ void create_screen_main() {
         }
     }
     
-    tick_screen_main();
+    // tick_screen_main(); // logic moved to ui_tick_task
 }
 
 void tick_screen_main() {
@@ -755,47 +755,94 @@ void tick_screen_main() {
     tick_e_screw_screen();
     
     {
-        char new_val_str[32];
-        snprintf(new_val_str, sizeof(new_val_str), "%ld", get_var_active_space_number());
-        const char *cur_val = lv_textarea_get_text(objects.obj1);
-        uint32_t max_length = lv_textarea_get_max_length(objects.obj1);
-        if (strncmp(new_val_str, cur_val, max_length) != 0) {
-            tick_value_change_obj = objects.obj1;
-            lv_textarea_set_text(objects.obj1, new_val_str);
-            tick_value_change_obj = NULL;
+        if (objects.obj1) {
+            char new_val_str[32];
+            snprintf(new_val_str, sizeof(new_val_str), "%ld", get_var_active_space_number());
+            const char *cur_val = lv_textarea_get_text(objects.obj1);
+            uint32_t max_length = lv_textarea_get_max_length(objects.obj1);
+            if (cur_val && strncmp(new_val_str, cur_val, max_length) != 0) {
+                tick_value_change_obj = objects.obj1;
+                lv_textarea_set_text(objects.obj1, new_val_str);
+                tick_value_change_obj = NULL;
+            }
         }
     }
     {
-        char new_val_str[32];
-        snprintf(new_val_str, sizeof(new_val_str), "%ld", get_var_active_tool_number());
-        const char *cur_val = lv_textarea_get_text(objects.active_tool_number);
-        uint32_t max_length = lv_textarea_get_max_length(objects.active_tool_number);
-        if (strncmp(new_val_str, cur_val, max_length) != 0) {
-            tick_value_change_obj = objects.active_tool_number;
-            lv_textarea_set_text(objects.active_tool_number, new_val_str);
-            tick_value_change_obj = NULL;
+        if (objects.active_tool_number) {
+            char new_val_str[32];
+            snprintf(new_val_str, sizeof(new_val_str), "%ld", get_var_active_tool_number());
+            const char *cur_val = lv_textarea_get_text(objects.active_tool_number);
+            uint32_t max_length = lv_textarea_get_max_length(objects.active_tool_number);
+            if (cur_val && strncmp(new_val_str, cur_val, max_length) != 0) {
+                tick_value_change_obj = objects.active_tool_number;
+                lv_textarea_set_text(objects.active_tool_number, new_val_str);
+                tick_value_change_obj = NULL;
+            }
         }
     }
     {
-        char new_val_str[32];
-        snprintf(new_val_str, sizeof(new_val_str), "%.4f", get_var_virtual_axis_4());
-        const char *cur_val = lv_textarea_get_text(objects.axis4_textarea);
-        uint32_t max_length = lv_textarea_get_max_length(objects.axis4_textarea);
-        if (strncmp(new_val_str, cur_val, max_length) != 0) {
-            tick_value_change_obj = objects.axis4_textarea;
-            lv_textarea_set_text(objects.axis4_textarea, new_val_str);
-            tick_value_change_obj = NULL;
+        if (objects.axis4_textarea) {
+            char new_val_str[32];
+            snprintf(new_val_str, sizeof(new_val_str), "%.4f", get_var_virtual_axis_4());
+            const char *cur_val = lv_textarea_get_text(objects.axis4_textarea);
+            uint32_t max_length = lv_textarea_get_max_length(objects.axis4_textarea);
+            if (cur_val && strncmp(new_val_str, cur_val, max_length) != 0) {
+                tick_value_change_obj = objects.axis4_textarea;
+                lv_textarea_set_text(objects.axis4_textarea, new_val_str);
+                tick_value_change_obj = NULL;
+            }
         }
     }
     {
-        char new_val_str[32];
-        snprintf(new_val_str, sizeof(new_val_str), "%.4f", get_var_virtual_axis_1());
-        const char *cur_val = lv_textarea_get_text(objects.axis1_textarea);
-        uint32_t max_length = lv_textarea_get_max_length(objects.axis1_textarea);
-        if (strncmp(new_val_str, cur_val, max_length) != 0) {
-            tick_value_change_obj = objects.axis1_textarea;
-            lv_textarea_set_text(objects.axis1_textarea, new_val_str);
-            tick_value_change_obj = NULL;
+        if (objects.axis1_textarea) {
+            char new_val_str[32];
+            snprintf(new_val_str, sizeof(new_val_str), "%.4f", get_var_virtual_axis_1());
+            const char *cur_val = lv_textarea_get_text(objects.axis1_textarea);
+            uint32_t max_length = lv_textarea_get_max_length(objects.axis1_textarea);
+            if (cur_val && strncmp(new_val_str, cur_val, max_length) != 0) {
+                tick_value_change_obj = objects.axis1_textarea;
+                lv_textarea_set_text(objects.axis1_textarea, new_val_str);
+                tick_value_change_obj = NULL;
+            }
+        }
+    }
+    {
+        if (objects.axis3_textarea) {
+            char new_val_str[32];
+            snprintf(new_val_str, sizeof(new_val_str), "%.4f", get_var_virtual_axis_3());
+            const char *cur_val = lv_textarea_get_text(objects.axis3_textarea);
+            uint32_t max_length = lv_textarea_get_max_length(objects.axis3_textarea);
+            if (cur_val && strncmp(new_val_str, cur_val, max_length) != 0) {
+                tick_value_change_obj = objects.axis3_textarea;
+                lv_textarea_set_text(objects.axis3_textarea, new_val_str);
+                tick_value_change_obj = NULL;
+            }
+        }
+    }
+    {
+        if (objects.axis5_textarea) {
+            char new_val_str[32];
+            snprintf(new_val_str, sizeof(new_val_str), "%.4f", get_var_virtual_axis_5());
+            const char *cur_val = lv_textarea_get_text(objects.axis5_textarea);
+            uint32_t max_length = lv_textarea_get_max_length(objects.axis5_textarea);
+            if (cur_val && strncmp(new_val_str, cur_val, max_length) != 0) {
+                tick_value_change_obj = objects.axis5_textarea;
+                lv_textarea_set_text(objects.axis5_textarea, new_val_str);
+                tick_value_change_obj = NULL;
+            }
+        }
+    }
+    {
+        if (objects.axis2_textarea) {
+            char new_val_str[32];
+            snprintf(new_val_str, sizeof(new_val_str), "%.4f", get_var_virtual_axis_2());
+            const char *cur_val = lv_textarea_get_text(objects.axis2_textarea);
+            uint32_t max_length = lv_textarea_get_max_length(objects.axis2_textarea);
+            if (cur_val && strncmp(new_val_str, cur_val, max_length) != 0) {
+                tick_value_change_obj = objects.axis2_textarea;
+                lv_textarea_set_text(objects.axis2_textarea, new_val_str);
+                tick_value_change_obj = NULL;
+            }
         }
     }
     {
