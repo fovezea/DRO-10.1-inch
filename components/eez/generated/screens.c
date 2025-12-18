@@ -552,10 +552,11 @@ void create_screen_main() {
                             lv_obj_set_pos(obj, 70, 378);
                             lv_obj_set_size(obj, 335, 80);
                             lv_textarea_set_max_length(obj, 9);
-                            lv_textarea_set_placeholder_text(obj, "8888.0000");
                             lv_textarea_set_one_line(obj, true);
                             lv_textarea_set_password_mode(obj, false);
                             lv_obj_add_event_cb(obj, event_handler_cb_main_axis4_textarea, LV_EVENT_ALL, 0);
+                            lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
+                            lv_obj_set_scrollbar_mode(obj, LV_SCROLLBAR_MODE_OFF);
                             add_style_text_area_axis_value(obj);
                         }
                         {
@@ -590,10 +591,11 @@ void create_screen_main() {
                             lv_obj_set_pos(obj, 70, 30);
                             lv_obj_set_size(obj, 335, 80);
                             lv_textarea_set_max_length(obj, 9);
-                            lv_textarea_set_placeholder_text(obj, "8888.0000");
                             lv_textarea_set_one_line(obj, true);
                             lv_textarea_set_password_mode(obj, false);
                             lv_obj_add_event_cb(obj, event_handler_cb_main_axis1_textarea, LV_EVENT_ALL, 0);
+                            lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
+                            lv_obj_set_scrollbar_mode(obj, LV_SCROLLBAR_MODE_OFF);
                             add_style_text_area_axis_value(obj);
                         }
                         {
@@ -603,10 +605,11 @@ void create_screen_main() {
                             lv_obj_set_pos(obj, 70, 262);
                             lv_obj_set_size(obj, 335, 80);
                             lv_textarea_set_max_length(obj, 9);
-                            lv_textarea_set_placeholder_text(obj, "8888.0000");
                             lv_textarea_set_one_line(obj, true);
                             lv_textarea_set_password_mode(obj, false);
                             lv_obj_add_event_cb(obj, event_handler_cb_main_axis3_textarea, LV_EVENT_ALL, 0);
+                            lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
+                            lv_obj_set_scrollbar_mode(obj, LV_SCROLLBAR_MODE_OFF);
                             add_style_text_area_axis_value(obj);
                         }
                         {
@@ -616,10 +619,11 @@ void create_screen_main() {
                             lv_obj_set_pos(obj, 70, 494);
                             lv_obj_set_size(obj, 335, 80);
                             lv_textarea_set_max_length(obj, 9);
-                            lv_textarea_set_placeholder_text(obj, "8888.0000");
                             lv_textarea_set_one_line(obj, true);
                             lv_textarea_set_password_mode(obj, false);
                             lv_obj_add_event_cb(obj, event_handler_cb_main_axis5_textarea, LV_EVENT_ALL, 0);
+                            lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
+                            lv_obj_set_scrollbar_mode(obj, LV_SCROLLBAR_MODE_OFF);
                             add_style_text_area_axis_value(obj);
                         }
                         {
@@ -629,10 +633,11 @@ void create_screen_main() {
                             lv_obj_set_pos(obj, 70, 146);
                             lv_obj_set_size(obj, 335, 80);
                             lv_textarea_set_max_length(obj, 9);
-                            lv_textarea_set_placeholder_text(obj, "8888.8888");
                             lv_textarea_set_one_line(obj, true);
                             lv_textarea_set_password_mode(obj, false);
                             lv_obj_add_event_cb(obj, event_handler_cb_main_axis2_textarea, LV_EVENT_ALL, 0);
+                            lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
+                            lv_obj_set_scrollbar_mode(obj, LV_SCROLLBAR_MODE_OFF);
                             add_style_text_area_axis_value(obj);
                         }
                         {

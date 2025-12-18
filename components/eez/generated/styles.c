@@ -226,6 +226,8 @@ void init_style_text_area_axis_value_MAIN_DEFAULT(lv_style_t *style) {
     lv_style_set_text_font(style, &ui_font_jet_brains_mono_bold_64);
     lv_style_set_text_align(style, LV_TEXT_ALIGN_RIGHT);
     lv_style_set_pad_right(style, 10);
+    lv_style_set_pad_top(style, 6);
+    lv_style_set_pad_bottom(style, 6);
     lv_style_set_bg_opa(style, LV_OPA_TRANSP);
     lv_style_set_border_width(style, 0);
 };
