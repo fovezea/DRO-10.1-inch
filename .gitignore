@@ -2,18 +2,22 @@
 .pytest_cache/
 __pycache__/
 
-# built binaries
+# Build directories
 build/
 build_*_*/
-# sdkconfig
+
+# sdkconfig backups
+sdkconfig.old
+
+# idf-component-manager output
+dependencies.lock
+managed_components/
+
+# Squareline backup/autosave
+**/squareline/backup/**
+**/squareline/autosave/**
 
 # idf-ci build run output
 build_summary_*.xml
 app_info_*.txt
 size_info_*.txt
-
-# idf-component-manager output
-dependencies.lock
-**/squareline/backup/**
-**/squareline/autosave/**
-/build

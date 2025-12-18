@@ -3,8 +3,8 @@
 #include "dro_core.h"
 #include "dro_nvs.h"
 #include "esp_log.h"
-#include <string.h>
 #include <stdlib.h> // For atoi, atof
+#include "calculator.h"
 
 static const char *TAG = "EEZ_UI_EVENTS";
 
@@ -112,6 +112,12 @@ static void event_half_request(lv_event_t * e) {
     }
 }
 
+static void event_calc_request(lv_event_t * e) {
+    if (objects.info_text_area) {
+        calculator_open(objects.info_text_area);
+    }
+}
+
 static void event_numpad_ready(lv_event_t * e) {
     if (!objects.info_text_area) return;
     const char* txt = lv_textarea_get_text(objects.info_text_area);
@@ -212,5 +218,20 @@ void dro_ui_events_init(void) {
     if (objects.numpad) {
         lv_obj_add_event_cb(objects.numpad, event_numpad_ready, LV_EVENT_READY, NULL);
         lv_obj_add_event_cb(objects.numpad, event_numpad_cancel, LV_EVENT_CANCEL, NULL);
+        
+        // Add Calc button dynamically since it's not in EEZ Studio
+        lv_obj_t *calc_btn = lv_button_create(lv_obj_get_parent(objects.info_text_area));
+        lv_obj_set_size(calc_btn, 100, 50);
+        lv_obj_align_to(calc_btn, objects.info_text_area, LV_ALIGN_OUT_LEFT_MID, -10, 0);
+        lv_obj_add_event_cb(calc_btn, event_calc_request, LV_EVENT_CLICKED, NULL);
+        
+        lv_obj_t *label = lv_label_create(calc_btn);
+        lv_label_set_text(label, "Calc");
+        lv_obj_center(label);
+        
+        // Style it like other buttons
+        lv_obj_set_style_bg_color(calc_btn, lv_color_hex(0x282b30), 0);
+        lv_obj_set_style_border_color(calc_btn, lv_color_hex(0xffffff), 0);
+        lv_obj_set_style_border_width(calc_btn, 2, 0);
     }
 }
