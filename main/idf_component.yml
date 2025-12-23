@@ -6,3 +6,6 @@ dependencies:
 
   espressif/esp_wifi_remote:
     version: "0.4.1"
+  
+  espressif/esp_hosted:
+    path: "../components/espressif__esp_hosted"

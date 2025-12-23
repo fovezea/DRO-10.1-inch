@@ -114,9 +114,24 @@ static esp_err_t check_slave_device_ready(void)
     if (ret == ESP_OK) {
         ESP_LOGI(TAG, "Slave device is ready - FW version: %d.%d.%d", 
                  fwver.major1, fwver.minor1, fwver.patch1);
+        
+        // Check for version compatibility warning
+        ESP_LOGI(TAG, "Host ESP-Hosted version: 2.7.0");
+        if (fwver.major1 != 2 || fwver.minor1 != 7) {
+            ESP_LOGW(TAG, "WARNING: Version mismatch detected!");
+            ESP_LOGW(TAG, "  Host version: 2.7.x");
+            ESP_LOGW(TAG, "  Slave version: %d.%d.x", fwver.major1, fwver.minor1);
+            ESP_LOGW(TAG, "  This may cause communication issues.");
+            ESP_LOGW(TAG, "  Consider updating slave firmware to match host version.");
+        }
         return ESP_OK;
     } else {
         ESP_LOGW(TAG, "Slave device not ready - fwversion check failed: %s", esp_err_to_name(ret));
+        ESP_LOGW(TAG, "This usually means:");
+        ESP_LOGW(TAG, "  1. Transport is not active (slave hasn't sent INIT event)");
+        ESP_LOGW(TAG, "  2. Slave firmware may be incompatible (old version 0.x.x vs host 2.7.x)");
+        ESP_LOGW(TAG, "  3. Slave device may not be powered or connected properly");
+        ESP_LOGW(TAG, "  4. SPI/SDIO communication may be broken");
         return ESP_FAIL;
     }
 }
