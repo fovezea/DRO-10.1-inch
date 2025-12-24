@@ -441,6 +441,13 @@ void app_main(void)
         ESP_LOGE(TAG, "Failed to initialize FPGA Comms");
     }
     
+    /* Initialize DRO System */
+    if (dro_init() == ESP_OK) {
+        ESP_LOGI(TAG, "DRO System Initialized");
+    } else {
+        ESP_LOGE(TAG, "DRO System Init Failed");
+    }
+
     /* Create tasks */
 
     // Create UI creation task (higher priority to run first)
@@ -453,14 +460,9 @@ void app_main(void)
     xTaskCreate(system_monitor_task, "system_monitor", 4096, NULL, 1, NULL);
     
     // Create delayed WiFi initialization task with slave device health checks
-    xTaskCreate(wifi_init_task, "wifi_init", 4096, NULL, 2, NULL);
+    // xTaskCreate(wifi_init_task, "wifi_init", 4096, NULL, 2, NULL);
 
-    // Initialize DRO System
-    if (dro_init() == ESP_OK) {
-        ESP_LOGI(TAG, "DRO System Initialized");
-    } else {
-        ESP_LOGE(TAG, "DRO System Init Failed");
-    }
+
 
 
     // Create DRO Update Task
@@ -490,13 +492,13 @@ static void dro_update_task(void *pvParameters)
             set_var_virtual_axis_4(state->axes[DRO_AXIS_W].displayed_value);
             set_var_virtual_axis_5(state->axes[DRO_AXIS_C].displayed_value);
         
-            // Update Unit Labels
-            const char* unit_str = (state->current_unit == DRO_UNIT_MM) ? "mm" : "in";
-            if (objects.mm_x_axis1_label) lv_label_set_text(objects.mm_x_axis1_label, unit_str);
-            if (objects.mm_x_axis2_label) lv_label_set_text(objects.mm_x_axis2_label, unit_str);
-            if (objects.mm_x_axis3_label) lv_label_set_text(objects.mm_x_axis3_label, unit_str);
-            if (objects.mm_x_axis4_label) lv_label_set_text(objects.mm_x_axis4_label, unit_str);
-            if (objects.mm_x_axis5_label) lv_label_set_text(objects.mm_x_axis5_label, unit_str);
+            // Update Unit Labels - REMOVED (Handled in screens.c tick_screen_main)
+            // const char* unit_str = (state->current_unit == DRO_UNIT_MM) ? "mm" : "in";
+            // if (objects.mm_x_axis1_label) lv_label_set_text(objects.mm_x_axis1_label, unit_str);
+            // if (objects.mm_x_axis2_label) lv_label_set_text(objects.mm_x_axis2_label, unit_str);
+            // if (objects.mm_x_axis3_label) lv_label_set_text(objects.mm_x_axis3_label, unit_str);
+            // if (objects.mm_x_axis4_label) lv_label_set_text(objects.mm_x_axis4_label, unit_str);
+            // if (objects.mm_x_axis5_label) lv_label_set_text(objects.mm_x_axis5_label, unit_str);
             
             // Optional: Update ABS/INC button label if it existed as a label, but it's a toggle button usually
             

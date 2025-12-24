@@ -62,6 +62,16 @@ esp_err_t dro_nvs_save_workspace(uint8_t space_index, const void* data, size_t s
  */
 esp_err_t dro_nvs_load_workspace(uint8_t space_index, void* data, size_t size);
 
+/**
+ * @brief Save axis config data (blob)
+ */
+esp_err_t dro_nvs_save_axis_config(uint8_t axis_index, const void* data, size_t size);
+
+/**
+ * @brief Load axis config data (blob)
+ */
+esp_err_t dro_nvs_load_axis_config(uint8_t axis_index, void* data, size_t size);
+
 #ifdef __cplusplus
 }
 #endif

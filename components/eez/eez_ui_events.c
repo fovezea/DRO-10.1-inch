@@ -222,7 +222,7 @@ void dro_ui_events_init(void) {
         // Add Calc button dynamically since it's not in EEZ Studio
         lv_obj_t *calc_btn = lv_button_create(lv_obj_get_parent(objects.info_text_area));
         lv_obj_set_size(calc_btn, 100, 50);
-        lv_obj_align_to(calc_btn, objects.info_text_area, LV_ALIGN_OUT_LEFT_MID, -10, 0);
+        lv_obj_align_to(calc_btn, objects.info_text_area, LV_ALIGN_OUT_LEFT_MID, 95, -65);
         lv_obj_add_event_cb(calc_btn, event_calc_request, LV_EVENT_CLICKED, NULL);
         
         lv_obj_t *label = lv_label_create(calc_btn);

@@ -29,8 +29,31 @@ typedef enum {
     DRO_MODE_INC        // Incremental (Work/Relative Zero)
 } dro_mode_t;
 
+typedef enum {
+    DRO_AXIS_TYPE_LINEAR = 0,
+    DRO_AXIS_TYPE_ROTARY
+} dro_axis_type_t;
+
+typedef enum {
+    DRO_MACHINE_TYPE_LATHE = 0,
+    DRO_MACHINE_TYPE_MILL,
+    DRO_MACHINE_TYPE_GRINDER,
+    DRO_MACHINE_TYPE_EDM
+} dro_machine_type_t;
+
 typedef struct {
-    float raw_position;     // Position from encoders (always mm)
+    bool enabled;
+    dro_axis_type_t type;
+    float pulses_per_unit;  // Pulses per mm (or inch? Usually native unit is mm)
+    float gear_ratio;       // 1.0 = direct
+    float leadscrew_pitch;  // mm per rev
+    bool inverted;
+    uint8_t reserved[8];    // Future proofing for NVS
+} dro_axis_config_t;
+
+typedef struct {
+    float raw_counts;       // CHANGED: Now storing raw counts from encoder
+    float position_mm;      // Caclulated position in mm (base unit)
     float work_offset;      // Zero point offset
     float tool_offset;      // Tool length offset
     float displayed_value;  // Final calculated value for UI
@@ -50,12 +73,20 @@ typedef struct {
 typedef struct {
     dro_unit_t current_unit;
     dro_mode_t current_mode;
+    dro_axis_config_t axis_configs[DRO_AXIS_COUNT]; // Added config
     dro_axis_state_t axes[DRO_AXIS_COUNT];
     int32_t active_tool_index;
     int32_t active_space_index;
     bool high_precision;
+    dro_machine_type_t machine_type; // New Setting
+    uint8_t active_axis_count;       // New Setting (1 to DRO_AXIS_COUNT)
     bool is_initialized;
 } dro_system_state_t;
+
+/**
+ * @brief Set and save axis configuration (runtime update)
+ */
+void dro_set_axis_config(uint8_t axis_index, dro_axis_config_t config);
 
 /**
  * @brief Initialize the DRO system and load state from NVS
@@ -68,12 +99,32 @@ esp_err_t dro_init(void);
 int dro_get_precision(void);
 
 /**
+ * @brief Set high precision mode (4 decimals for MM, 5 for INCH)
+ */
+void dro_set_high_precision(bool enabled);
+
+/**
+ * @brief Set machine type (Lathe, Mill, etc.)
+ */
+void dro_set_machine_type(dro_machine_type_t type);
+
+/**
+ * @brief Set number of active axes
+ */
+void dro_set_active_axis_count(uint8_t count);
+
+/**
  * @brief Main tick function to calculate positions
  * Used to update displayed values based on current raw inputs
  */
 void dro_update(void);
 
 // --- Global Actions ---
+
+/**
+ * @brief Get the unit name string for a specific axis (e.g., "mm", "inch", "deg")
+ */
+const char* dro_get_axis_unit_name(uint8_t axis_index);
 
 /**
  * @brief Toggle between MM and INCH
@@ -94,7 +145,14 @@ const dro_system_state_t* dro_get_state(void);
 // --- Axis Actions ---
 
 /**
- * @brief Update the raw physical position of an axis (from encoders)
+ * @brief Update the raw physical counts of an axis (from encoders)
+ * This will trigger a recalculation of the position based on axis config (puls/unit, gear, etc.)
+ */
+void dro_set_raw_counts(uint8_t axis_index, int32_t counts);
+
+/**
+ * @brief DEPRECATED: Use dro_set_raw_counts instead.
+ * Kept for basic compatibility during migration.
  */
 void dro_set_raw_position(uint8_t axis_index, float position_mm);
 

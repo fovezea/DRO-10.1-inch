@@ -74,6 +74,19 @@ We will create a new component `components/dro_system` to encapsulate the busine
     *   Logic: `WorkOffset = CurrentRawPos - (CurrentRelPos / 2)`.
 2.  **Tool Selection**:
     *   Click `Tool Number` button -> Enter ID -> Call `dro_tool_apply(ID)`.
+    
+### Phase 5: Advanced Features (New)
+*Goal: Extended functionality for machine measurement and error correction.*
+
+1.  **Backlash Compensation**:
+    *   Implement logic to add/subtract a fixed backlash value when axis direction changes.
+    *   Add UI in settings to configure backlash amount per axis.
+2.  **Tool Length Setup**:
+    *   UI Wizard or specialized screen to measure and capture tool length offsets automatically (possibly using a touch probe input).
+    *   Integration with measuring the reference tool vs. active tool.
+3.  **Origin Setup**:
+    *   Support for multiple Work Coordinate Systems (WCS) (e.g., G54, G55 equivalent).
+    *   UI to save/recall specific origin points.
 
 ---
 

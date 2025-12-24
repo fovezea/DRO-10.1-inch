@@ -27,7 +27,24 @@ esp_err_t dro_init(void) {
 
     // Load Axis States
     for (int i = 0; i < DRO_AXIS_COUNT; i++) {
-        system_state.axes[i].raw_position = 0.0f; // Reset on boot
+        system_state.axes[i].raw_counts = 0.0f;
+        system_state.axes[i].position_mm = 0.0f;
+        
+        // Load Config from NVS
+        esp_err_t err = dro_nvs_load_axis_config(i, &system_state.axis_configs[i], sizeof(dro_axis_config_t));
+        
+        if (err != ESP_OK) {
+            // Default Config (Safety defaults if not found)
+            ESP_LOGW(TAG, "Axis %d config not found, using defaults", i);
+            system_state.axis_configs[i].enabled = true;
+            system_state.axis_configs[i].type = DRO_AXIS_TYPE_LINEAR;
+            system_state.axis_configs[i].pulses_per_unit = 200.0f; 
+            system_state.axis_configs[i].gear_ratio = 1.0f;
+            system_state.axis_configs[i].inverted = false;
+            
+            // Save default to NVS so it exists next time
+            dro_nvs_save_axis_config(i, &system_state.axis_configs[i], sizeof(dro_axis_config_t));
+        }
     }
 
     // Load and Apply Active Tool
@@ -42,6 +59,10 @@ esp_err_t dro_init(void) {
 
     // Initial precision settings
     system_state.high_precision = false;
+    
+    // Default Machine settings
+    system_state.machine_type = DRO_MACHINE_TYPE_MILL;
+    system_state.active_axis_count = 3;
 
     system_state.is_initialized = true;
     ESP_LOGI(TAG, "DRO System Initialized. Units: %d, Mode: %d", system_state.current_unit, system_state.current_mode);
@@ -56,35 +77,91 @@ int dro_get_precision(void) {
     if (system_state.current_unit == DRO_UNIT_MM) {
         return system_state.high_precision ? 4 : 3;
     } else {
+
         return system_state.high_precision ? 5 : 4;
     }
+}
+
+void dro_set_high_precision(bool enabled) {
+    system_state.high_precision = enabled;
+    // dro_nvs_save_param(DRO_KEY_PRECISION, enabled ? 1 : 0); // TODO: Add key if persistence needed
+    ESP_LOGI(TAG, "High Precision Set: %d", enabled);
+}
+
+void dro_set_machine_type(dro_machine_type_t type) {
+    system_state.machine_type = type;
+    // dro_nvs_save_param(DRO_KEY_MACHINE_TYPE, (int32_t)type); // TODO: Add key
+    ESP_LOGI(TAG, "Machine Type Set: %d", type);
+}
+
+void dro_set_active_axis_count(uint8_t count) {
+    if (count > DRO_AXIS_COUNT) count = DRO_AXIS_COUNT;
+    if (count < 1) count = 1;
+    
+    system_state.active_axis_count = count;
+    // dro_nvs_save_param(DRO_KEY_AXIS_COUNT, (int32_t)count); // TODO: Add key
+    ESP_LOGI(TAG, "Active Axis Count Set: %d", count);
+}
+
+const char* dro_get_axis_unit_name(uint8_t axis_index) {
+    if (axis_index >= DRO_AXIS_COUNT) return "";
+    
+    if (system_state.axis_configs[axis_index].type == DRO_AXIS_TYPE_ROTARY) {
+        return "deg";
+    }
+    
+    return (system_state.current_unit == DRO_UNIT_INCH) ? "inch" : "mm";
 }
 
 void dro_update(void) {
     if (!system_state.is_initialized) return;
 
     for (int i = 0; i < DRO_AXIS_COUNT; i++) {
+        // Skip disabled axes
+        if (!system_state.axis_configs[i].enabled) {
+            system_state.axes[i].displayed_value = 0.0f;
+            continue;
+        }
+
+        // 1. Calculate Physical Position (MM) from Raw Counts
+        // Formula: Pos = (Counts / PPU) * Gear * Sign
+        float ppu = system_state.axis_configs[i].pulses_per_unit;
+        if (ppu == 0.0f) ppu = 1.0f; // Safety
+        
+        float base_pos = (system_state.axes[i].raw_counts / ppu) * system_state.axis_configs[i].gear_ratio;
+        
+        if (system_state.axis_configs[i].inverted) {
+            base_pos = -base_pos;
+        }
+        
+        system_state.axes[i].position_mm = base_pos;
+
+        // 2. Apply Offsets (Work Coordinates)
         float result_mm = 0.0f;
         
         if (system_state.current_mode == DRO_MODE_ABS) {
-            // Absolute Mode: Show scaled absolute position
-            // (Typically Machine Zero, but simplified here as just raw)
-            // TODO: Clarify "Machine Zero" vs "Work Zero" concept mapping
-            // For now: ABS = Raw (Machine Coords)
-            result_mm = system_state.axes[i].raw_position;
+            // Absolute: Raw Machine Coords
+            result_mm = system_state.axes[i].position_mm;
         } else {
-            // Incremental Mode: Work Offset applied
+            // Incremental: Apply Work & Tool Offsets
             // Result = Raw - WorkOffset - ToolOffset
-            result_mm = system_state.axes[i].raw_position - 
+            result_mm = system_state.axes[i].position_mm - 
                        system_state.axes[i].work_offset - 
                        system_state.axes[i].tool_offset;
         }
 
-        // Apply Unit Conversion
-        if (system_state.current_unit == DRO_UNIT_INCH) {
-            system_state.axes[i].displayed_value = result_mm / 25.4f;
+        // 3. Unit Conversion (for Display)
+        // If Rotary, we usually stay in Degrees (base unit for rotary is assumed Deg not mm if configured properly?)
+        // Let's assume for Rotary, the "MM" position is actually "Degrees".
+        if (system_state.axis_configs[i].type == DRO_AXIS_TYPE_ROTARY) {
+             system_state.axes[i].displayed_value = result_mm;
         } else {
-            system_state.axes[i].displayed_value = result_mm;
+            // Linear Axis: Convert MM/Inch
+            if (system_state.current_unit == DRO_UNIT_INCH) {
+                system_state.axes[i].displayed_value = result_mm / 25.4f;
+            } else {
+                system_state.axes[i].displayed_value = result_mm;
+            }
         }
     }
 }
@@ -109,9 +186,41 @@ void dro_toggle_mode(void) {
     ESP_LOGI(TAG, "Mode toggled to %d", system_state.current_mode);
 }
 
+void dro_set_raw_counts(uint8_t axis_index, int32_t counts) {
+    if (axis_index >= DRO_AXIS_COUNT) return;
+    system_state.axes[axis_index].raw_counts = (float)counts;
+    // dro_update() will handle the recalculation on next tick
+}
+
 void dro_set_raw_position(uint8_t axis_index, float position_mm) {
     if (axis_index >= DRO_AXIS_COUNT) return;
-    system_state.axes[axis_index].raw_position = position_mm;
+    
+    // Reverse engineer counts for compatibility
+    // Pos = (Counts / PPU) * Gear
+    // Counts = (Pos / Gear) * PPU
+    float ppu = system_state.axis_configs[axis_index].pulses_per_unit;
+    if (ppu == 0.0f) ppu = 200.0f; 
+    float gear = system_state.axis_configs[axis_index].gear_ratio;
+    if (gear == 0.0f) gear = 1.0f;
+
+    float counts = (position_mm / gear) * ppu;
+    if (system_state.axis_configs[axis_index].inverted) counts = -counts;
+    
+    system_state.axes[axis_index].raw_counts = counts;
+}
+
+
+
+void dro_set_axis_config(uint8_t axis_index, dro_axis_config_t config) {
+    if (axis_index >= DRO_AXIS_COUNT) return;
+    
+    // Update runtime state
+    system_state.axis_configs[axis_index] = config;
+    
+    // Save to NVS
+    dro_nvs_save_axis_config(axis_index, &config, sizeof(dro_axis_config_t));
+    
+    ESP_LOGI(TAG, "Axis %d config updated and saved.", axis_index);
 }
 
 void dro_axis_zero(uint8_t axis_index) {
@@ -128,7 +237,7 @@ void dro_axis_zero(uint8_t axis_index) {
     // Let's assume the user wants to zero the current viewing coordinate system.
     // So we update Work Offset regardless of mode, but effect is visible in INC.
     
-    float new_offset = system_state.axes[axis_index].raw_position - system_state.axes[axis_index].tool_offset;
+    float new_offset = system_state.axes[axis_index].position_mm - system_state.axes[axis_index].tool_offset;
     system_state.axes[axis_index].work_offset = new_offset;
     
     // Save to active workspace
@@ -159,7 +268,7 @@ void dro_axis_set_value(uint8_t axis_index, float value) {
 
     // Display_mm = Raw - WorkOffset - Tool
     // WorkOffset = Raw - Tool - Display_mm
-    float new_offset = system_state.axes[axis_index].raw_position - 
+    float new_offset = system_state.axes[axis_index].position_mm - 
                        system_state.axes[axis_index].tool_offset - 
                        value_mm;
 
@@ -185,7 +294,7 @@ void dro_axis_half(uint8_t axis_index) {
     // It's effectively setting the value to (Current / 2)
     
     // Calculate current relative position in mm
-    float current_rel_mm = system_state.axes[axis_index].raw_position - 
+    float current_rel_mm = system_state.axes[axis_index].position_mm - 
                            system_state.axes[axis_index].work_offset - 
                            system_state.axes[axis_index].tool_offset;
     
@@ -193,7 +302,7 @@ void dro_axis_half(uint8_t axis_index) {
     float target_mm = current_rel_mm / 2.0f;
     
     // WorkOffset = Raw - Tool - Target
-    float new_offset = system_state.axes[axis_index].raw_position - 
+    float new_offset = system_state.axes[axis_index].position_mm - 
                        system_state.axes[axis_index].tool_offset - 
                        target_mm;
                        

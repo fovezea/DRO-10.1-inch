@@ -9,6 +9,8 @@
 #include "styles.h"
 #include "ui.h"
 #include "../e_screw_screen.h"
+#include <math.h>
+#include "dro_core.h"
 
 
 objects_t objects;
@@ -104,6 +106,414 @@ static void tab_button_event_handler(lv_event_t *e) {
 }
 
 
+
+// --- Custom Axis Settings UI Helpers ---
+
+typedef struct {
+    lv_obj_t *sw_enable;
+    lv_obj_t *dd_type;
+    lv_obj_t *sw_invert;
+    lv_obj_t *ta_ppu;
+    lv_obj_t *ta_gear;
+    lv_obj_t *ta_pitch;
+    // Calib handles
+    lv_obj_t *ta_dist;
+    lv_obj_t *lbl_calib_status; // To show "Start Set" or result
+    lv_obj_t *dd_resolution;
+} axis_settings_ui_t;
+
+static axis_settings_ui_t axis_ui_handles[DRO_AXIS_COUNT];
+static float axis_calib_start_counts[DRO_AXIS_COUNT];
+static bool axis_dirty_flags[DRO_AXIS_COUNT] = {false};
+
+static void event_handler_resolution_change(lv_event_t *e) {
+    int axis_index = (int)(intptr_t)lv_event_get_user_data(e);
+    if (axis_index >= DRO_AXIS_COUNT) return;
+    
+    lv_obj_t *dd = lv_event_get_target(e);
+    uint32_t selected = lv_dropdown_get_selected(dd);
+    
+    float new_ppu = 0.0f;
+    // Options: "1 um\n2 um\n5 um\n10 um\nCustom"
+    // 1 um = 1000 pulses/mm
+    // 2 um = 500 pulses/mm
+    // 5 um = 200 pulses/mm
+    // 10 um = 100 pulses/mm
+    
+    switch(selected) {
+        case 0: new_ppu = 1000.0f; break;
+        case 1: new_ppu = 500.0f; break;
+        case 2: new_ppu = 200.0f; break;
+        case 3: new_ppu = 100.0f; break;
+        default: return; // Custom or match failed
+    }
+    
+    if (new_ppu > 0.0f) {
+        char buf[16];
+        snprintf(buf, sizeof(buf), "%.2f", new_ppu);
+        lv_textarea_set_text(axis_ui_handles[axis_index].ta_ppu, buf);
+        
+        // Mark dirty since we changed a value programmatically
+        axis_dirty_flags[axis_index] = true;
+    }
+}
+
+static void event_handler_high_precision_toggle(lv_event_t *e) {
+    lv_obj_t *sw = lv_event_get_target(e);
+    bool enabled = lv_obj_has_state(sw, LV_STATE_CHECKED);
+    dro_set_high_precision(enabled);
+}
+
+static void event_handler_machine_type_change(lv_event_t *e) {
+    lv_obj_t *dropdown = lv_event_get_target(e);
+    uint16_t selected = lv_dropdown_get_selected(dropdown);
+    dro_set_machine_type((dro_machine_type_t)selected);
+}
+
+static void event_handler_axis_count_change(lv_event_t *e) {
+    lv_obj_t *dropdown = lv_event_get_target(e);
+    uint16_t selected = lv_dropdown_get_selected(dropdown);
+    // Selected 0 => 1 Axis, 1 => 2 Axes, etc.
+    dro_set_active_axis_count((uint8_t)(selected + 1));
+}
+
+static void msgbox_discard_event_handler(lv_event_t * e) {
+    lv_obj_t * mbox = (lv_obj_t *)lv_event_get_user_data(e);
+    
+    if (mbox) {
+        int axis_index = (int)(intptr_t)lv_obj_get_user_data(mbox);
+        if (axis_index >= 0 && axis_index < DRO_AXIS_COUNT) {
+            axis_dirty_flags[axis_index] = false;
+        }
+        lv_msgbox_close(mbox);
+    }
+    
+    lv_scr_load(objects.main);
+}
+
+static void msgbox_cancel_event_handler(lv_event_t * e) {
+    lv_obj_t * mbox = (lv_obj_t *)lv_event_get_user_data(e);
+    if (mbox) lv_msgbox_close(mbox);
+}
+
+static void event_handler_return_check(lv_event_t *e) {
+    int axis_index = (int)(intptr_t)lv_event_get_user_data(e);
+    if (axis_index >= DRO_AXIS_COUNT) return;
+
+    if (axis_dirty_flags[axis_index]) {
+        // LVGL v9 API
+        lv_obj_t * mbox = lv_msgbox_create(NULL);
+        lv_msgbox_add_title(mbox, "Unsaved Changes");
+        lv_msgbox_add_text(mbox, "You have unsaved changes. Do you want to discard them?");
+        
+        // Store axis_index in mbox user data
+        lv_obj_set_user_data(mbox, (void*)(intptr_t)axis_index);
+
+        lv_obj_t * btn_discard = lv_msgbox_add_footer_button(mbox, "Discard");
+        lv_obj_t * btn_cancel = lv_msgbox_add_footer_button(mbox, "Cancel");
+
+        // Pass mbox as user_data to buttons so we can delete it
+        lv_obj_add_event_cb(btn_discard, msgbox_discard_event_handler, LV_EVENT_CLICKED, mbox);
+        lv_obj_add_event_cb(btn_cancel, msgbox_cancel_event_handler, LV_EVENT_CLICKED, mbox);
+
+        lv_obj_center(mbox);
+    } else {
+        lv_scr_load(objects.main);
+    }
+}
+
+static void mark_axis_dirty(lv_event_t *e) {
+    int axis_index = (int)(intptr_t)lv_event_get_user_data(e);
+    if (axis_index >= 0 && axis_index < DRO_AXIS_COUNT) {
+        // Only mark dirty if it wasn't already (optional optimization)
+        if (!axis_dirty_flags[axis_index]) {
+            axis_dirty_flags[axis_index] = true;
+            // Optional: Update UI to show "Modified" state?
+        }
+    }
+}
+
+static void event_handler_calib_start(lv_event_t *e) {
+    int axis_index = (int)(intptr_t)lv_event_get_user_data(e);
+    if (axis_index >= DRO_AXIS_COUNT) return;
+    
+    const dro_system_state_t *state = dro_get_state();
+    axis_calib_start_counts[axis_index] = state->axes[axis_index].raw_counts;
+    
+    lv_label_set_text(axis_ui_handles[axis_index].lbl_calib_status, "Start Point Set. Move axis now.");
+}
+
+static void event_handler_calib_finish(lv_event_t *e) {
+    int axis_index = (int)(intptr_t)lv_event_get_user_data(e);
+    if (axis_index >= DRO_AXIS_COUNT) return;
+
+    const dro_system_state_t *state = dro_get_state();
+    float current_counts = state->axes[axis_index].raw_counts;
+    float start_counts = axis_calib_start_counts[axis_index];
+    float delta_counts = current_counts - start_counts;
+    
+    // Get distance
+    const char* txt_dist = lv_textarea_get_text(axis_ui_handles[axis_index].ta_dist);
+    float dist = atof(txt_dist);
+    
+    if (dist == 0.0f) {
+        lv_label_set_text(axis_ui_handles[axis_index].lbl_calib_status, "Error: Distance is 0");
+        return;
+    }
+    
+    // Calculate PPU = Counts / Dist
+    // We take absolute value of PPU (direction handled by Invert)
+    // Actually, delta might be negative if moved backwards. Dist is usually positive.
+    float new_ppu = fabsf(delta_counts / dist);
+    
+    // Update UI
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%.4f", new_ppu);
+    lv_textarea_set_text(axis_ui_handles[axis_index].ta_ppu, buf);
+    
+    lv_label_set_text_fmt(axis_ui_handles[axis_index].lbl_calib_status, "Calc: %.0f/%.1f = %.4f", delta_counts, dist, new_ppu);
+}
+
+static void event_handler_save_axis_settings(lv_event_t *e) {
+    int axis_index = (int)(intptr_t)lv_event_get_user_data(e);
+    if (axis_index >= DRO_AXIS_COUNT) return;
+    
+    // Read values from UI
+    bool enabled = lv_obj_has_state(axis_ui_handles[axis_index].sw_enable, LV_STATE_CHECKED);
+    uint32_t type = lv_dropdown_get_selected(axis_ui_handles[axis_index].dd_type);
+    bool inverted = lv_obj_has_state(axis_ui_handles[axis_index].sw_invert, LV_STATE_CHECKED);
+    
+    // Parse floats
+    const char* txt_ppu = lv_textarea_get_text(axis_ui_handles[axis_index].ta_ppu);
+    const char* txt_gear = lv_textarea_get_text(axis_ui_handles[axis_index].ta_gear);
+    const char* txt_pitch = lv_textarea_get_text(axis_ui_handles[axis_index].ta_pitch);
+    
+    float ppu = atof(txt_ppu);
+    float gear = atof(txt_gear);
+    float pitch = atof(txt_pitch);
+    
+    if (ppu == 0.0f) ppu = 200.0f; // Safety
+    
+    // Update System State directly (dirty way, but quick for now)
+    // Ideally we should have a setter in dro_core
+    // But direct access is fine since we are "System UI"
+    // Wait, system_state is static in dro_core.c, so we can't access it directly unless exposed.
+    // dro_get_state() returns const pointer.
+    
+    // We need dro_save_axis_config(index, config) in dro_core exposed? 
+    // Or just construct the struct and save to NVS, and reload?
+    
+    dro_axis_config_t config;
+    config.enabled = enabled;
+    config.type = (dro_axis_type_t)type;
+    config.pulses_per_unit = ppu;
+    config.gear_ratio = gear;
+    config.inverted = inverted;
+    config.leadscrew_pitch = pitch;
+    
+    // Save to NVS and Update Runtime
+    dro_set_axis_config(axis_index, config);
+    
+    // Clear Dirty Flag
+    axis_dirty_flags[axis_index] = false;
+
+    // LOG
+    LV_LOG_USER("Saved Axis %d: PPU=%.2f, Gear=%.2f, Type=%d", axis_index, ppu, gear, (int)type);
+    
+    // Optional: Visual Feedback
+   lv_obj_t *btn = lv_event_get_target(e);
+   lv_obj_set_style_bg_color(btn, lv_color_hex(0x00FF00), 0); // Green feedback
+}
+
+static void create_axis_settings_ui(lv_obj_t *parent, int axis_index) {
+    if (axis_index >= DRO_AXIS_COUNT) return;
+    
+    // Get current config
+    const dro_system_state_t *state = dro_get_state();
+    dro_axis_config_t config = state->axis_configs[axis_index];
+
+    // 1. Enable Switch
+    lv_obj_t *sw_enable = lv_switch_create(parent);
+    lv_obj_set_pos(sw_enable, 20, 20);
+    lv_obj_set_size(sw_enable, 50, 25);
+    if (config.enabled) lv_obj_add_state(sw_enable, LV_STATE_CHECKED);
+    lv_obj_add_event_cb(sw_enable, mark_axis_dirty, LV_EVENT_VALUE_CHANGED, (void*)(intptr_t)axis_index);
+    axis_ui_handles[axis_index].sw_enable = sw_enable;
+    
+    lv_obj_t *lbl_enable = lv_label_create(parent);
+    lv_obj_set_pos(lbl_enable, 80, 22);
+    lv_obj_set_style_text_font(lbl_enable, &lv_font_montserrat_22, 0);
+    lv_label_set_text(lbl_enable, "Enable Axis");
+
+    // 2. Type Dropdown
+    lv_obj_t *dd_type = lv_dropdown_create(parent);
+    lv_dropdown_set_options(dd_type, "Linear\nRotary");
+    lv_dropdown_set_selected(dd_type, (uint16_t)config.type);
+    lv_obj_set_pos(dd_type, 20, 80);
+    lv_obj_set_width(dd_type, 180);
+    lv_obj_set_style_text_font(dd_type, &lv_font_montserrat_22, 0);
+    lv_obj_add_event_cb(dd_type, mark_axis_dirty, LV_EVENT_VALUE_CHANGED, (void*)(intptr_t)axis_index);
+    axis_ui_handles[axis_index].dd_type = dd_type;
+
+    // 3. Invert Switch (Moved right)
+    lv_obj_t *sw_invert = lv_switch_create(parent);
+    lv_obj_set_pos(sw_invert, 350, 20);
+    lv_obj_set_size(sw_invert, 50, 25);
+    if (config.inverted) lv_obj_add_state(sw_invert, LV_STATE_CHECKED);
+    lv_obj_add_event_cb(sw_invert, mark_axis_dirty, LV_EVENT_VALUE_CHANGED, (void*)(intptr_t)axis_index);
+    axis_ui_handles[axis_index].sw_invert = sw_invert;
+    
+    lv_obj_t *lbl_invert = lv_label_create(parent);
+    lv_obj_set_pos(lbl_invert, 410, 22);
+    lv_obj_set_style_text_font(lbl_invert, &lv_font_montserrat_22, 0);
+    lv_label_set_text(lbl_invert, "Invert Direction");
+
+    // 4. Pulses Per Unit (Moved down)
+    lv_obj_t *ta_ppu = lv_textarea_create(parent);
+    lv_obj_set_pos(ta_ppu, 20, 200);
+    lv_obj_set_size(ta_ppu, 250, 50);
+    lv_obj_set_style_text_font(ta_ppu, &lv_font_montserrat_22, 0);
+    lv_textarea_set_one_line(ta_ppu, true);
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%.2f", config.pulses_per_unit);
+    lv_textarea_set_text(ta_ppu, buf);
+    lv_obj_add_event_cb(ta_ppu, mark_axis_dirty, LV_EVENT_VALUE_CHANGED, (void*)(intptr_t)axis_index);
+    axis_ui_handles[axis_index].ta_ppu = ta_ppu;
+    
+    lv_obj_t *lbl_ppu = lv_label_create(parent);
+    lv_obj_set_pos(lbl_ppu, 20, 160);
+    lv_obj_set_style_text_font(lbl_ppu, &lv_font_montserrat_22, 0);
+    lv_label_set_text(lbl_ppu, "Pulses Per Unit");
+    
+    // Resolution Dropdown (Moved down)
+    lv_obj_t *dd_res = lv_dropdown_create(parent);
+    lv_dropdown_set_options(dd_res, "1 um\n2 um\n5 um\n10 um\nCustom");
+    lv_obj_set_pos(dd_res, 20, 300); 
+    lv_obj_set_width(dd_res, 150);
+    lv_obj_set_style_text_font(dd_res, &lv_font_montserrat_22, 0);
+    lv_obj_add_event_cb(dd_res, event_handler_resolution_change, LV_EVENT_VALUE_CHANGED, (void*)(intptr_t)axis_index);
+    axis_ui_handles[axis_index].dd_resolution = dd_res;
+    
+    // Auto-select resolution
+    int res_idx = 4; // Custom
+    if (fabsf(config.pulses_per_unit - 1000.0f) < 0.01f) res_idx = 0;
+    else if (fabsf(config.pulses_per_unit - 500.0f) < 0.01f) res_idx = 1;
+    else if (fabsf(config.pulses_per_unit - 200.0f) < 0.01f) res_idx = 2;
+    else if (fabsf(config.pulses_per_unit - 100.0f) < 0.01f) res_idx = 3;
+    lv_dropdown_set_selected(dd_res, res_idx);
+
+    lv_obj_t *lbl_res = lv_label_create(parent);
+    lv_obj_set_pos(lbl_res, 20, 270);
+    lv_obj_set_style_text_font(lbl_res, &lv_font_montserrat_22, 0);
+    lv_label_set_text(lbl_res, "Resolution");
+
+    // 5. Gear Ratio (Moved Right & Down)
+    lv_obj_t *ta_gear = lv_textarea_create(parent);
+    lv_obj_set_pos(ta_gear, 350, 200);
+    lv_obj_set_size(ta_gear, 150, 50);
+    lv_obj_set_style_text_font(ta_gear, &lv_font_montserrat_22, 0);
+    lv_textarea_set_one_line(ta_gear, true);
+    snprintf(buf, sizeof(buf), "%.2f", config.gear_ratio);
+    lv_textarea_set_text(ta_gear, buf);
+    lv_obj_add_event_cb(ta_gear, mark_axis_dirty, LV_EVENT_VALUE_CHANGED, (void*)(intptr_t)axis_index);
+    axis_ui_handles[axis_index].ta_gear = ta_gear;
+
+    lv_obj_t *lbl_gear = lv_label_create(parent);
+    lv_obj_set_pos(lbl_gear, 350, 160);
+    lv_obj_set_style_text_font(lbl_gear, &lv_font_montserrat_22, 0);
+    lv_label_set_text(lbl_gear, "Gear Ratio");
+
+    // 6. Lead Screw Pitch (Moved Right & Down)
+    lv_obj_t *ta_pitch = lv_textarea_create(parent);
+    lv_obj_set_pos(ta_pitch, 600, 200);
+    lv_obj_set_size(ta_pitch, 150, 50);
+    lv_obj_set_style_text_font(ta_pitch, &lv_font_montserrat_22, 0);
+    lv_textarea_set_one_line(ta_pitch, true);
+    snprintf(buf, sizeof(buf), "%.2f", config.leadscrew_pitch);
+    lv_textarea_set_text(ta_pitch, buf);
+    lv_obj_add_event_cb(ta_pitch, mark_axis_dirty, LV_EVENT_VALUE_CHANGED, (void*)(intptr_t)axis_index);
+    axis_ui_handles[axis_index].ta_pitch = ta_pitch;
+
+    lv_obj_t *lbl_pitch = lv_label_create(parent);
+    lv_obj_set_pos(lbl_pitch, 600, 160);
+    lv_obj_set_style_text_font(lbl_pitch, &lv_font_montserrat_22, 0);
+    lv_label_set_text(lbl_pitch, "Pitch (mm/rev)");
+    
+    // 7. Save Button (Moved Down)
+    lv_obj_t *btn_save = lv_btn_create(parent);
+    lv_obj_set_pos(btn_save, 20, 380);
+    lv_obj_set_size(btn_save, 140, 50);
+    lv_obj_add_event_cb(btn_save, event_handler_save_axis_settings, LV_EVENT_CLICKED, (void*)(intptr_t)axis_index);
+    
+    lv_obj_t *lbl_save = lv_label_create(btn_save);
+    lv_obj_center(lbl_save);
+    lv_obj_set_style_text_font(lbl_save, &lv_font_montserrat_22, 0);
+    lv_label_set_text(lbl_save, "SAVE");
+
+    // 8. Return Button (Inside Tab)
+    lv_obj_t *btn_back = lv_btn_create(parent);
+    lv_obj_set_pos(btn_back, 1150, 10); // Top right corner of the tab
+    lv_obj_set_size(btn_back, 100, 40);
+    lv_obj_add_event_cb(btn_back, event_handler_return_check, LV_EVENT_CLICKED, (void*)(intptr_t)axis_index);
+    lv_obj_set_style_bg_color(btn_back, lv_color_hex(0xFF0000), 0); // Red
+    
+    lv_obj_t *lbl_back = lv_label_create(btn_back);
+    lv_obj_center(lbl_back);
+    lv_label_set_text(lbl_back, "RETURN");
+
+
+    // --- Calibration Wizard Section ---
+    lv_obj_t *cont_calib = lv_obj_create(parent);
+    lv_obj_set_pos(cont_calib, 600, 320); // Moved down 300px (was 400)
+    lv_obj_set_size(cont_calib, 600, 300); // Increased Size
+    lv_obj_set_style_bg_opa(cont_calib, LV_OPA_20, 0); 
+    
+    lv_obj_t *lbl_calib_title = lv_label_create(cont_calib);
+    lv_obj_set_pos(lbl_calib_title, 10, 5);
+    lv_label_set_text(lbl_calib_title, "Calibration Wizard");
+    lv_obj_set_style_text_font(lbl_calib_title, &lv_font_montserrat_22, 0);
+
+    // Status Label
+    lv_obj_t *lbl_status = lv_label_create(cont_calib);
+    lv_obj_set_pos(lbl_status, 10, 220); // Moved down due to larger spacing
+    lv_obj_set_style_text_font(lbl_status, &lv_font_montserrat_22, 0);
+    lv_label_set_text(lbl_status, "Status: Ready");
+    axis_ui_handles[axis_index].lbl_calib_status = lbl_status;
+
+    // 1. Set Start
+    lv_obj_t *btn_start = lv_btn_create(cont_calib);
+    lv_obj_set_pos(btn_start, 10, 50);
+    lv_obj_set_size(btn_start, 140, 50);
+    lv_obj_add_event_cb(btn_start, event_handler_calib_start, LV_EVENT_CLICKED, (void*)(intptr_t)axis_index);
+    lv_obj_t *lbl_btn_start = lv_label_create(btn_start);
+    lv_obj_center(lbl_btn_start);
+    lv_obj_set_style_text_font(lbl_btn_start, &lv_font_montserrat_22, 0);
+    lv_label_set_text(lbl_btn_start, "Set Start");
+
+    // 2. Known Distance Input
+    lv_obj_t *ta_dist = lv_textarea_create(cont_calib);
+    lv_obj_set_pos(ta_dist, 180, 50);
+    lv_obj_set_size(ta_dist, 180, 50);
+    lv_obj_set_style_text_font(ta_dist, &lv_font_montserrat_22, 0);
+    lv_textarea_set_one_line(ta_dist, true);
+    lv_textarea_set_placeholder_text(ta_dist, "Dist (e.g. 10.0)");
+    axis_ui_handles[axis_index].ta_dist = ta_dist;
+
+    // 3. Button Calibrate
+    lv_obj_t *btn_calib = lv_btn_create(cont_calib);
+    lv_obj_set_pos(btn_calib, 380, 50);
+    lv_obj_set_size(btn_calib, 160, 50);
+    lv_obj_add_event_cb(btn_calib, event_handler_calib_finish, LV_EVENT_CLICKED, (void*)(intptr_t)axis_index);
+    lv_obj_t *lbl_btn_calib = lv_label_create(btn_calib);
+    lv_obj_center(lbl_btn_calib);
+    lv_obj_set_style_text_font(lbl_btn_calib, &lv_font_montserrat_22, 0);
+    lv_label_set_text(lbl_btn_calib, "CALCULATE");
+    
+    lv_obj_t *lbl_instr = lv_label_create(cont_calib);
+    lv_obj_set_pos(lbl_instr, 10, 120);
+    lv_obj_set_style_text_font(lbl_instr, &lv_font_montserrat_22, 0);
+    lv_label_set_text(lbl_instr, "1. Click 'Set Start'.\n2. Move axis by known distance.\n3. Enter distance & Click 'Calculate'.");
+}
 
 void create_screen_main() {
     lv_obj_t *obj = lv_obj_create(0);
@@ -558,6 +968,7 @@ void create_screen_main() {
                             lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
                             lv_obj_set_scrollbar_mode(obj, LV_SCROLLBAR_MODE_OFF);
                             add_style_text_area_axis_value(obj);
+                            lv_textarea_set_text(obj, "");
                         }
                         {
                             // Status bar labels
@@ -597,6 +1008,7 @@ void create_screen_main() {
                             lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
                             lv_obj_set_scrollbar_mode(obj, LV_SCROLLBAR_MODE_OFF);
                             add_style_text_area_axis_value(obj);
+                            lv_textarea_set_text(obj, "");
                         }
                         {
                             // Axis3_textarea
@@ -611,6 +1023,7 @@ void create_screen_main() {
                             lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
                             lv_obj_set_scrollbar_mode(obj, LV_SCROLLBAR_MODE_OFF);
                             add_style_text_area_axis_value(obj);
+                            lv_textarea_set_text(obj, "");
                         }
                         {
                             // Axis5_textarea
@@ -625,6 +1038,7 @@ void create_screen_main() {
                             lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
                             lv_obj_set_scrollbar_mode(obj, LV_SCROLLBAR_MODE_OFF);
                             add_style_text_area_axis_value(obj);
+                            lv_textarea_set_text(obj, "");
                         }
                         {
                             // Axis2_textarea
@@ -639,6 +1053,7 @@ void create_screen_main() {
                             lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
                             lv_obj_set_scrollbar_mode(obj, LV_SCROLLBAR_MODE_OFF);
                             add_style_text_area_axis_value(obj);
+                            lv_textarea_set_text(obj, "");
                         }
                         {
                             // axis5_label
@@ -768,6 +1183,9 @@ void create_screen_main() {
 }
 
 void tick_screen_main() {
+    // Get state for precision checks
+    const dro_system_state_t* state = dro_get_state();
+
     // Update status labels
     if (objects.mode_status_label) {
         lv_label_set_text(objects.mode_status_label, get_var_mode_text());
@@ -775,6 +1193,13 @@ void tick_screen_main() {
     if (objects.conn_status_label) {
         lv_label_set_text(objects.conn_status_label, get_var_conn_status_text());
     }
+    
+    // Update Unit Labels (Dynamic based on settings)
+    if (objects.mm_x_axis1_label) lv_label_set_text(objects.mm_x_axis1_label, dro_get_axis_unit_name(0));
+    if (objects.mm_x_axis2_label) lv_label_set_text(objects.mm_x_axis2_label, dro_get_axis_unit_name(1));
+    if (objects.mm_x_axis3_label) lv_label_set_text(objects.mm_x_axis3_label, dro_get_axis_unit_name(2));
+    if (objects.mm_x_axis4_label) lv_label_set_text(objects.mm_x_axis4_label, dro_get_axis_unit_name(3));
+    if (objects.mm_x_axis5_label) lv_label_set_text(objects.mm_x_axis5_label, dro_get_axis_unit_name(4));
 
     // Update E-Screw screen
     tick_e_screw_screen();
@@ -806,22 +1231,10 @@ void tick_screen_main() {
         }
     }
     {
-        if (objects.axis4_textarea) {
-            char new_val_str[32];
-            snprintf(new_val_str, sizeof(new_val_str), "%.*f", get_var_axis_precision(), get_var_virtual_axis_4());
-            const char *cur_val = lv_textarea_get_text(objects.axis4_textarea);
-            uint32_t max_length = lv_textarea_get_max_length(objects.axis4_textarea);
-            if (cur_val && strncmp(new_val_str, cur_val, max_length) != 0) {
-                tick_value_change_obj = objects.axis4_textarea;
-                lv_textarea_set_text(objects.axis4_textarea, new_val_str);
-                tick_value_change_obj = NULL;
-            }
-        }
-    }
-    {
         if (objects.axis1_textarea) {
+            int precision = (state && state->axis_configs[0].type == DRO_AXIS_TYPE_ROTARY) ? 4 : get_var_axis_precision();
             char new_val_str[32];
-            snprintf(new_val_str, sizeof(new_val_str), "%.*f", get_var_axis_precision(), get_var_virtual_axis_1());
+            snprintf(new_val_str, sizeof(new_val_str), "%.*f", precision, get_var_virtual_axis_1());
             const char *cur_val = lv_textarea_get_text(objects.axis1_textarea);
             uint32_t max_length = lv_textarea_get_max_length(objects.axis1_textarea);
             if (cur_val && strncmp(new_val_str, cur_val, max_length) != 0) {
@@ -832,35 +1245,10 @@ void tick_screen_main() {
         }
     }
     {
-        if (objects.axis3_textarea) {
-            char new_val_str[32];
-            snprintf(new_val_str, sizeof(new_val_str), "%.*f", get_var_axis_precision(), get_var_virtual_axis_3());
-            const char *cur_val = lv_textarea_get_text(objects.axis3_textarea);
-            uint32_t max_length = lv_textarea_get_max_length(objects.axis3_textarea);
-            if (cur_val && strncmp(new_val_str, cur_val, max_length) != 0) {
-                tick_value_change_obj = objects.axis3_textarea;
-                lv_textarea_set_text(objects.axis3_textarea, new_val_str);
-                tick_value_change_obj = NULL;
-            }
-        }
-    }
-    {
-        if (objects.axis5_textarea) {
-            char new_val_str[32];
-            snprintf(new_val_str, sizeof(new_val_str), "%.*f", get_var_axis_precision(), get_var_virtual_axis_5());
-            const char *cur_val = lv_textarea_get_text(objects.axis5_textarea);
-            uint32_t max_length = lv_textarea_get_max_length(objects.axis5_textarea);
-            if (cur_val && strncmp(new_val_str, cur_val, max_length) != 0) {
-                tick_value_change_obj = objects.axis5_textarea;
-                lv_textarea_set_text(objects.axis5_textarea, new_val_str);
-                tick_value_change_obj = NULL;
-            }
-        }
-    }
-    {
         if (objects.axis2_textarea) {
+            int precision = (state && state->axis_configs[1].type == DRO_AXIS_TYPE_ROTARY) ? 4 : get_var_axis_precision();
             char new_val_str[32];
-            snprintf(new_val_str, sizeof(new_val_str), "%.*f", get_var_axis_precision(), get_var_virtual_axis_2());
+            snprintf(new_val_str, sizeof(new_val_str), "%.*f", precision, get_var_virtual_axis_2());
             const char *cur_val = lv_textarea_get_text(objects.axis2_textarea);
             uint32_t max_length = lv_textarea_get_max_length(objects.axis2_textarea);
             if (cur_val && strncmp(new_val_str, cur_val, max_length) != 0) {
@@ -871,38 +1259,51 @@ void tick_screen_main() {
         }
     }
     {
-        char new_val_str[32];
-        snprintf(new_val_str, sizeof(new_val_str), "%.*f", get_var_axis_precision(), get_var_virtual_axis_3());
-        const char *cur_val = lv_textarea_get_text(objects.axis3_textarea);
-        uint32_t max_length = lv_textarea_get_max_length(objects.axis3_textarea);
-        if (strncmp(new_val_str, cur_val, max_length) != 0) {
-            tick_value_change_obj = objects.axis3_textarea;
-            lv_textarea_set_text(objects.axis3_textarea, new_val_str);
-            tick_value_change_obj = NULL;
+        if (objects.axis3_textarea) {
+            int precision = (state && state->axis_configs[2].type == DRO_AXIS_TYPE_ROTARY) ? 4 : get_var_axis_precision();
+            char new_val_str[32];
+            snprintf(new_val_str, sizeof(new_val_str), "%.*f", precision, get_var_virtual_axis_3());
+            const char *cur_val = lv_textarea_get_text(objects.axis3_textarea);
+            uint32_t max_length = lv_textarea_get_max_length(objects.axis3_textarea);
+            if (cur_val && strncmp(new_val_str, cur_val, max_length) != 0) {
+                tick_value_change_obj = objects.axis3_textarea;
+                lv_textarea_set_text(objects.axis3_textarea, new_val_str);
+                tick_value_change_obj = NULL;
+            }
         }
     }
     {
-        char new_val_str[32];
-        snprintf(new_val_str, sizeof(new_val_str), "%.*f", get_var_axis_precision(), get_var_virtual_axis_5());
-        const char *cur_val = lv_textarea_get_text(objects.axis5_textarea);
-        uint32_t max_length = lv_textarea_get_max_length(objects.axis5_textarea);
-        if (strncmp(new_val_str, cur_val, max_length) != 0) {
-            tick_value_change_obj = objects.axis5_textarea;
-            lv_textarea_set_text(objects.axis5_textarea, new_val_str);
-            tick_value_change_obj = NULL;
+        if (objects.axis4_textarea) {
+            int precision = (state && state->axis_configs[3].type == DRO_AXIS_TYPE_ROTARY) ? 4 : get_var_axis_precision();
+            char new_val_str[32];
+            snprintf(new_val_str, sizeof(new_val_str), "%.*f", precision, get_var_virtual_axis_4());
+            const char *cur_val = lv_textarea_get_text(objects.axis4_textarea);
+            uint32_t max_length = lv_textarea_get_max_length(objects.axis4_textarea);
+            if (cur_val && strncmp(new_val_str, cur_val, max_length) != 0) {
+                tick_value_change_obj = objects.axis4_textarea;
+                lv_textarea_set_text(objects.axis4_textarea, new_val_str);
+                tick_value_change_obj = NULL;
+            }
         }
     }
     {
-        char new_val_str[32];
-        snprintf(new_val_str, sizeof(new_val_str), "%.*f", get_var_axis_precision(), get_var_virtual_axis_2());
-        const char *cur_val = lv_textarea_get_text(objects.axis2_textarea);
-        uint32_t max_length = lv_textarea_get_max_length(objects.axis2_textarea);
-        if (strncmp(new_val_str, cur_val, max_length) != 0) {
-            tick_value_change_obj = objects.axis2_textarea;
-            lv_textarea_set_text(objects.axis2_textarea, new_val_str);
-            tick_value_change_obj = NULL;
+        if (objects.axis5_textarea) {
+            int precision = (state && state->axis_configs[4].type == DRO_AXIS_TYPE_ROTARY) ? 4 : get_var_axis_precision();
+            char new_val_str[32];
+            snprintf(new_val_str, sizeof(new_val_str), "%.*f", precision, get_var_virtual_axis_5());
+            const char *cur_val = lv_textarea_get_text(objects.axis5_textarea);
+            uint32_t max_length = lv_textarea_get_max_length(objects.axis5_textarea);
+            if (cur_val && strncmp(new_val_str, cur_val, max_length) != 0) {
+                tick_value_change_obj = objects.axis5_textarea;
+                lv_textarea_set_text(objects.axis5_textarea, new_val_str);
+                tick_value_change_obj = NULL;
+            }
         }
     }
+}
+
+static void event_handler_back_to_main(lv_event_t *e) {
+    lv_scr_load(objects.main);
 }
 
 void create_screen_setings_page() {
@@ -928,49 +1329,129 @@ void create_screen_setings_page() {
                     lv_obj_t *obj = lv_tabview_add_tab(parent_obj, "Axis 1");
                     objects.axis1_tab = obj;
                     add_style_tab_style(obj);
+                    create_axis_settings_ui(obj, 0);
                 }
                 {
                     // axis2
                     lv_obj_t *obj = lv_tabview_add_tab(parent_obj, "Axis 2");
                     objects.axis2 = obj;
+                    create_axis_settings_ui(obj, 1);
                 }
                 {
                     // axis3_tab
                     lv_obj_t *obj = lv_tabview_add_tab(parent_obj, "Axis 3");
                     objects.axis3_tab = obj;
+                    create_axis_settings_ui(obj, 2);
                 }
                 {
                     // axis4_tab
                     lv_obj_t *obj = lv_tabview_add_tab(parent_obj, "Axis 4");
                     objects.axis4_tab = obj;
+                    create_axis_settings_ui(obj, 3);
                 }
                 {
                     // axis5_tab
                     lv_obj_t *obj = lv_tabview_add_tab(parent_obj, "Axis 5");
                     objects.axis5_tab = obj;
+                    create_axis_settings_ui(obj, 4);
                 }
                 {
                     // general_settings_tab
                     lv_obj_t *obj = lv_tabview_add_tab(parent_obj, "General");
                     objects.general_settings_tab = obj;
+                    
+                    // Return Button for General Tab
+                    {
+                        lv_obj_t *btn_back = lv_btn_create(obj);
+                        lv_obj_set_pos(btn_back, 1150, 10); // Top right
+                        lv_obj_set_size(btn_back, 100, 40);
+                        lv_obj_add_event_cb(btn_back, event_handler_back_to_main, LV_EVENT_CLICKED, NULL);
+                        lv_obj_set_style_bg_color(btn_back, lv_color_hex(0xFF0000), 0);
+                        
+                        lv_obj_t *lbl = lv_label_create(btn_back);
+                        lv_obj_center(lbl);
+                        lv_label_set_text(lbl, "RETURN");
+                    }
+                    // Global Settings Controls (Moved here to be inside General Tab)
+                    {
+                        lv_obj_t *obj = lv_label_create(objects.general_settings_tab);
+                        lv_obj_set_pos(obj, 43, 96);
+                        lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+                        add_style_setting_page_label(obj);
+                        lv_label_set_text(obj, "Liniar axes in mm");
+                    }
+                    {
+                        // settings_mm_switch
+                        lv_obj_t *obj = lv_switch_create(objects.general_settings_tab);
+                        objects.settings_mm_switch = obj;
+                        lv_obj_set_pos(obj, 934, 106);
+                        lv_obj_set_size(obj, 50, 25);
+                        lv_obj_add_event_cb(obj, action_settings_mm_switch_pressed, LV_EVENT_CLICKED, (void *)0);
+                        lv_obj_add_state(obj, LV_STATE_CHECKED);
+                    }
+                    {
+                        // High Precision Switch
+                        lv_obj_t *obj = lv_switch_create(objects.general_settings_tab);
+                        objects.settings_high_precision_switch = obj;
+                        lv_obj_set_pos(obj, 934, 150); // Below MM switch
+                        lv_obj_set_size(obj, 50, 25);
+                        
+                        // Set initial state
+                        if (dro_get_state()->high_precision) {
+                            lv_obj_add_state(obj, LV_STATE_CHECKED);
+                        }
+
+                        lv_obj_add_event_cb(obj, event_handler_high_precision_toggle, LV_EVENT_VALUE_CHANGED, NULL);
+                        
+                        lv_obj_t *lbl = lv_label_create(objects.general_settings_tab);
+                        lv_obj_set_pos(lbl, 43, 155);
+                        add_style_setting_page_label(lbl); // Reuse style
+                        lv_label_set_text(lbl, "High Precision");
+                    }
+                    
+                    {
+                        // Machine Type Label
+                        lv_obj_t *lbl = lv_label_create(objects.general_settings_tab);
+                        lv_obj_set_pos(lbl, 43, 210);
+                        add_style_setting_page_label(lbl);
+                        lv_label_set_text(lbl, "Machine Type");
+                        
+                        // Machine Type Dropdown
+                        lv_obj_t *dd = lv_dropdown_create(objects.general_settings_tab);
+                        lv_dropdown_set_options(dd, "Lathe\nMill\nGrinder\nEDM");
+                        lv_obj_set_pos(dd, 934, 205);
+                        lv_obj_set_width(dd, 150);
+                        lv_obj_set_style_text_font(dd, &lv_font_montserrat_22, 0);
+                        
+                        // Set current selection
+                        lv_dropdown_set_selected(dd, (uint16_t)dro_get_state()->machine_type);
+                        
+                        lv_obj_add_event_cb(dd, event_handler_machine_type_change, LV_EVENT_VALUE_CHANGED, NULL);
+                    }
+
+                    {
+                        // Axis Count Label
+                        lv_obj_t *lbl = lv_label_create(objects.general_settings_tab);
+                        lv_obj_set_pos(lbl, 43, 270);
+                        add_style_setting_page_label(lbl);
+                        lv_label_set_text(lbl, "Number of Axes");
+                        
+                        // Axis Count Dropdown
+                        lv_obj_t *dd = lv_dropdown_create(objects.general_settings_tab);
+                        lv_dropdown_set_options(dd, "1 Axis\n2 Axes\n3 Axes\n4 Axes\n5 Axes");
+                        lv_obj_set_pos(dd, 934, 265);
+                        lv_obj_set_width(dd, 150);
+                        lv_obj_set_style_text_font(dd, &lv_font_montserrat_22, 0);
+                        
+                        // Set current selection (count - 1)
+                        uint8_t count = dro_get_state()->active_axis_count;
+                        if (count > 0) count--; 
+                        lv_dropdown_set_selected(dd, count);
+                        
+                        lv_obj_add_event_cb(dd, event_handler_axis_count_change, LV_EVENT_VALUE_CHANGED, NULL);
+                    }
                 }
             }
-        }
-        {
-            lv_obj_t *obj = lv_label_create(parent_obj);
-            lv_obj_set_pos(obj, 43, 96);
-            lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-            add_style_setting_page_label(obj);
-            lv_label_set_text(obj, "Liniar axes in mm");
-        }
-        {
-            // settings_mm_switch
-            lv_obj_t *obj = lv_switch_create(parent_obj);
-            objects.settings_mm_switch = obj;
-            lv_obj_set_pos(obj, 934, 106);
-            lv_obj_set_size(obj, 50, 25);
-            lv_obj_add_event_cb(obj, action_settings_mm_switch_pressed, LV_EVENT_CLICKED, (void *)0);
-            lv_obj_add_state(obj, LV_STATE_CHECKED);
         }
     }
     

@@ -150,3 +150,33 @@ esp_err_t dro_nvs_load_workspace(uint8_t space_index, void* data, size_t size) {
     nvs_close(handle);
     return err;
 }
+
+esp_err_t dro_nvs_save_axis_config(uint8_t axis_index, const void* data, size_t size) {
+    char key[16];
+    snprintf(key, sizeof(key), "axcfg_%d", axis_index);
+    
+    nvs_handle_t handle;
+    esp_err_t err = dro_nvs_open(&handle, NVS_READWRITE);
+    if (err != ESP_OK) return err;
+
+    err = nvs_set_blob(handle, key, data, size);
+    if (err == ESP_OK) {
+        err = nvs_commit(handle);
+    }
+    nvs_close(handle);
+    return err;
+}
+
+esp_err_t dro_nvs_load_axis_config(uint8_t axis_index, void* data, size_t size) {
+    char key[16];
+    snprintf(key, sizeof(key), "axcfg_%d", axis_index);
+    
+    nvs_handle_t handle;
+    esp_err_t err = dro_nvs_open(&handle, NVS_READONLY);
+    if (err != ESP_OK) return err;
+
+    size_t required_size = size;
+    err = nvs_get_blob(handle, key, data, &required_size);
+    nvs_close(handle);
+    return err;
+}
