@@ -116,10 +116,10 @@ static esp_err_t check_slave_device_ready(void)
                  fwver.major1, fwver.minor1, fwver.patch1);
         
         // Check for version compatibility warning
-        ESP_LOGI(TAG, "Host ESP-Hosted version: 2.7.0");
-        if (fwver.major1 != 2 || fwver.minor1 != 7) {
+        ESP_LOGI(TAG, "Host ESP-Hosted version: 2.8.0");
+        if (fwver.major1 != 2 || fwver.minor1 != 8) {
             ESP_LOGW(TAG, "WARNING: Version mismatch detected!");
-            ESP_LOGW(TAG, "  Host version: 2.7.x");
+            ESP_LOGW(TAG, "  Host version: 2.8.x");
             ESP_LOGW(TAG, "  Slave version: %d.%d.x", fwver.major1, fwver.minor1);
             ESP_LOGW(TAG, "  This may cause communication issues.");
             ESP_LOGW(TAG, "  Consider updating slave firmware to match host version.");
@@ -460,7 +460,7 @@ void app_main(void)
     xTaskCreate(system_monitor_task, "system_monitor", 4096, NULL, 1, NULL);
     
     // Create delayed WiFi initialization task with slave device health checks
-    // xTaskCreate(wifi_init_task, "wifi_init", 4096, NULL, 2, NULL);
+    xTaskCreate(wifi_init_task, "wifi_init", 4096, NULL, 2, NULL);
 
 
 
