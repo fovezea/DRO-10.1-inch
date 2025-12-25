@@ -35,14 +35,14 @@ esp_err_t axis_mapping_init(void) {
     // Read Z-axis mapping
     err = nvs_get_u8(nvs_handle, "z_axis", &g_z_axis_mapping);
     if (err != ESP_OK) {
-        ESP_LOGW(TAG, "Z-axis mapping not found, using default: %d", DEFAULT_Z_AXIS_MAPPING);
+        ESP_LOGD(TAG, "Z-axis mapping not found, using default: %d", DEFAULT_Z_AXIS_MAPPING);
         g_z_axis_mapping = DEFAULT_Z_AXIS_MAPPING;
     }
     
     // Read X-axis mapping
     err = nvs_get_u8(nvs_handle, "x_axis", &g_x_axis_mapping);
     if (err != ESP_OK) {
-        ESP_LOGW(TAG, "X-axis mapping not found, using default: %d", DEFAULT_X_AXIS_MAPPING);
+        ESP_LOGD(TAG, "X-axis mapping not found, using default: %d", DEFAULT_X_AXIS_MAPPING);
         g_x_axis_mapping = DEFAULT_X_AXIS_MAPPING;
     }
     
@@ -58,7 +58,7 @@ esp_err_t axis_mapping_init(void) {
             // Use default name
             strncpy(g_axis_names[i], default_names[i], AXIS_NAME_MAX_LEN);
             g_axis_names[i][AXIS_NAME_MAX_LEN] = '\0';
-            ESP_LOGW(TAG, "Axis %d name not found, using default: %s", i, g_axis_names[i]);
+            ESP_LOGD(TAG, "Axis %d name not found, using default: %s", i, g_axis_names[i]);
         }
     }
     

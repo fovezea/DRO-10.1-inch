@@ -13,6 +13,9 @@
 #include "dro_core.h"
 
 
+static void event_handler_back_to_main(lv_event_t *e);
+
+
 objects_t objects;
 lv_obj_t *tick_value_change_obj;
 uint32_t active_theme_index = 0;
@@ -513,6 +516,387 @@ static void create_axis_settings_ui(lv_obj_t *parent, int axis_index) {
     lv_obj_set_pos(lbl_instr, 10, 120);
     lv_obj_set_style_text_font(lbl_instr, &lv_font_montserrat_22, 0);
     lv_label_set_text(lbl_instr, "1. Click 'Set Start'.\n2. Move axis by known distance.\n3. Enter distance & Click 'Calculate'.");
+}
+
+void create_functions_tab_ui(lv_obj_t *parent) {
+    // Disable scrolling on the tab page itself
+    lv_obj_remove_flag(parent, LV_OBJ_FLAG_SCROLLABLE);
+
+    // --- TOP SECTION: DRO VALUES ---
+    lv_obj_t *cont_top = lv_obj_create(parent);
+    lv_obj_set_pos(cont_top, 0, 0);
+    lv_obj_set_size(cont_top, 1280, 100);
+    lv_obj_set_style_bg_opa(cont_top, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(cont_top, 0, 0);
+
+    // X Value
+    lv_obj_t *lbl_x = lv_label_create(cont_top);
+    lv_obj_set_pos(lbl_x, 50, 30);
+    lv_obj_set_style_text_font(lbl_x, &ui_font_jet_brains_mono_bold_64, 0); // Corrected Font
+    lv_label_set_text(lbl_x, "X 0.000"); // Removed + sign
+
+    // Y Value
+    lv_obj_t *lbl_y = lv_label_create(cont_top);
+    lv_obj_set_pos(lbl_y, 450, 30);
+    lv_obj_set_style_text_font(lbl_y, &ui_font_jet_brains_mono_bold_64, 0); // Corrected Font
+    lv_label_set_text(lbl_y, "Y 0.000"); // Removed + sign
+
+    // Z Value
+    lv_obj_t *lbl_z = lv_label_create(cont_top);
+    lv_obj_set_pos(lbl_z, 850, 30);
+    lv_obj_set_style_text_font(lbl_z, &ui_font_jet_brains_mono_bold_64, 0); // Corrected Font
+    lv_label_set_text(lbl_z, "Z 0.000"); // Removed + sign
+
+    // --- MIDDLE SECTION: SPLIT PANELS ---
+    // Left Panel: Linear
+    lv_obj_t *cont_left = lv_obj_create(parent);
+    lv_obj_set_pos(cont_left, 0, 100);
+    lv_obj_set_size(cont_left, 620, 500); 
+    lv_obj_set_style_border_width(cont_left, 2, 0);
+    lv_obj_set_style_border_color(cont_left, lv_color_hex(0xf9f600), 0); 
+
+    lv_obj_t *lbl_lin_title = lv_label_create(cont_left);
+    lv_obj_set_pos(lbl_lin_title, 200, 10);
+    lv_obj_set_style_text_font(lbl_lin_title, &lv_font_montserrat_22, 0);
+    lv_obj_set_style_text_color(lbl_lin_title, lv_color_hex(0xf9f600), 0); 
+    lv_label_set_text(lbl_lin_title, "LINEAR PATTERN");
+
+    // --- GRAPHIC MOCKUP (Top Area) ---
+    // Mockup: 4 holes, 25 deg angle. 
+    // Start approx (200, 200). Vector (+54, -25) per hole.
+
+    // Line (Axis)
+    static lv_point_precise_t line_points[] = { {200, 200}, {362, 125} };
+    lv_obj_t * line1 = lv_line_create(cont_left);
+    lv_line_set_points(line1, line_points, 2);
+    lv_obj_set_style_line_width(line1, 2, 0);
+    lv_obj_set_style_line_color(line1, lv_color_hex(0x808080), 0); // Grey axis line
+
+    // Hole 0
+    lv_obj_t *h0 = lv_obj_create(cont_left);
+    lv_obj_set_size(h0, 12, 12);
+    lv_obj_set_style_radius(h0, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(h0, lv_color_hex(0x00FF00), 0); // Green
+    lv_obj_set_style_border_width(h0, 0, 0);
+    lv_obj_set_pos(h0, 194, 194); // Centered on (200, 200)
+
+    // Hole 1 (+54, -25) -> (254, 175)
+    lv_obj_t *h1 = lv_obj_create(cont_left);
+    lv_obj_set_size(h1, 12, 12);
+    lv_obj_set_style_radius(h1, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(h1, lv_color_hex(0x00FF00), 0);
+    lv_obj_set_style_border_width(h1, 0, 0);
+    lv_obj_set_pos(h1, 248, 169);
+
+    // Hole 2 (+108, -50) -> (308, 150)
+    lv_obj_t *h2 = lv_obj_create(cont_left);
+    lv_obj_set_size(h2, 12, 12);
+    lv_obj_set_style_radius(h2, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(h2, lv_color_hex(0x00FF00), 0);
+    lv_obj_set_style_border_width(h2, 0, 0);
+    lv_obj_set_pos(h2, 302, 144);
+
+    // Hole 3 (+162, -75) -> (362, 125)
+    lv_obj_t *h3 = lv_obj_create(cont_left);
+    lv_obj_set_size(h3, 12, 12);
+    lv_obj_set_style_radius(h3, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(h3, lv_color_hex(0x00FF00), 0);
+    lv_obj_set_style_border_width(h3, 0, 0);
+    lv_obj_set_pos(h3, 356, 119);
+
+
+    // Row 1: Holes
+    lv_obj_t *lbl_lin_holes = lv_label_create(cont_left);
+    lv_obj_set_pos(lbl_lin_holes, 50, 300); 
+    lv_obj_set_style_text_font(lbl_lin_holes, &lv_font_montserrat_22, 0);
+    lv_obj_set_style_text_color(lbl_lin_holes, lv_color_hex(0xf9f600), 0);
+    lv_label_set_text(lbl_lin_holes, "Number of Holes:");
+
+    lv_obj_t *ta_lin_holes = lv_textarea_create(cont_left);
+    lv_obj_set_pos(ta_lin_holes, 300, 290);
+    lv_obj_set_size(ta_lin_holes, 150, 50);
+    lv_obj_set_style_text_font(ta_lin_holes, &lv_font_montserrat_22, 0);
+    lv_textarea_set_one_line(ta_lin_holes, true);
+    lv_textarea_set_text(ta_lin_holes, "4"); // Updated default to 4
+
+    // Row 2: Spacing (NEW)
+    lv_obj_t *lbl_lin_space = lv_label_create(cont_left);
+    lv_obj_set_pos(lbl_lin_space, 50, 370); 
+    lv_obj_set_style_text_font(lbl_lin_space, &lv_font_montserrat_22, 0);
+    lv_obj_set_style_text_color(lbl_lin_space, lv_color_hex(0xf9f600), 0);
+    lv_label_set_text(lbl_lin_space, "Hole Spacing:");
+
+    lv_obj_t *ta_lin_space = lv_textarea_create(cont_left);
+    lv_obj_set_pos(ta_lin_space, 300, 360);
+    lv_obj_set_size(ta_lin_space, 150, 50);
+    lv_obj_set_style_text_font(ta_lin_space, &lv_font_montserrat_22, 0);
+    lv_textarea_set_one_line(ta_lin_space, true);
+    lv_textarea_set_text(ta_lin_space, "15.0"); // Updated default to 15.0
+
+    // Row 3: Angle
+    lv_obj_t *lbl_lin_angle = lv_label_create(cont_left);
+    lv_obj_set_pos(lbl_lin_angle, 50, 440); // Shifted down
+    lv_obj_set_style_text_font(lbl_lin_angle, &lv_font_montserrat_22, 0);
+    lv_obj_set_style_text_color(lbl_lin_angle, lv_color_hex(0xf9f600), 0);
+    lv_label_set_text(lbl_lin_angle, "Angle:");
+
+    lv_obj_t *ta_lin_angle = lv_textarea_create(cont_left);
+    lv_obj_set_pos(ta_lin_angle, 300, 430); // Shifted down
+    lv_obj_set_size(ta_lin_angle, 150, 50);
+    lv_obj_set_style_text_font(ta_lin_angle, &lv_font_montserrat_22, 0);
+    lv_textarea_set_one_line(ta_lin_angle, true);
+    lv_textarea_set_text(ta_lin_angle, "25.0"); // Updated default to 25.0
+
+    // Right Panel: Circular
+    lv_obj_t *cont_right = lv_obj_create(parent);
+    lv_obj_set_pos(cont_right, 620, 100); 
+    lv_obj_set_size(cont_right, 620, 500); 
+    lv_obj_set_style_border_width(cont_right, 2, 0);
+    lv_obj_set_style_border_color(cont_right, lv_color_hex(0xf9f600), 0); 
+
+    lv_obj_t *lbl_circ_title = lv_label_create(cont_right);
+    lv_obj_set_pos(lbl_circ_title, 200, 10);
+    lv_obj_set_style_text_font(lbl_circ_title, &lv_font_montserrat_22, 0);
+    lv_obj_set_style_text_color(lbl_circ_title, lv_color_hex(0xf9f600), 0); 
+    lv_label_set_text(lbl_circ_title, "CIRCULAR PATTERN");
+
+    // Row 1: Holes
+    lv_obj_t *lbl_circ_holes = lv_label_create(cont_right);
+    lv_obj_set_pos(lbl_circ_holes, 50, 300);
+    lv_obj_set_style_text_font(lbl_circ_holes, &lv_font_montserrat_22, 0);
+    lv_obj_set_style_text_color(lbl_circ_holes, lv_color_hex(0xf9f600), 0);
+    lv_label_set_text(lbl_circ_holes, "Number of Holes:");
+
+    lv_obj_t *ta_circ_holes = lv_textarea_create(cont_right);
+    lv_obj_set_pos(ta_circ_holes, 300, 290);
+    lv_obj_set_size(ta_circ_holes, 150, 50);
+    lv_obj_set_style_text_font(ta_circ_holes, &lv_font_montserrat_22, 0);
+    lv_textarea_set_one_line(ta_circ_holes, true);
+    lv_textarea_set_text(ta_circ_holes, "6");
+
+    // Row 2: Radius
+    lv_obj_t *lbl_circ_radius = lv_label_create(cont_right);
+    lv_obj_set_pos(lbl_circ_radius, 50, 370);
+    lv_obj_set_style_text_font(lbl_circ_radius, &lv_font_montserrat_22, 0);
+    lv_obj_set_style_text_color(lbl_circ_radius, lv_color_hex(0xf9f600), 0);
+    lv_label_set_text(lbl_circ_radius, "Radius:");
+
+    lv_obj_t *ta_circ_radius = lv_textarea_create(cont_right);
+    lv_obj_set_pos(ta_circ_radius, 300, 360);
+    lv_obj_set_size(ta_circ_radius, 150, 50);
+    lv_obj_set_style_text_font(ta_circ_radius, &lv_font_montserrat_22, 0);
+    lv_textarea_set_one_line(ta_circ_radius, true);
+    lv_textarea_set_text(ta_circ_radius, "50.0");
+
+    // Row 3: Start Angle (NEW)
+    lv_obj_t *lbl_circ_angle = lv_label_create(cont_right);
+    lv_obj_set_pos(lbl_circ_angle, 50, 440); // Shifted down
+    lv_obj_set_style_text_font(lbl_circ_angle, &lv_font_montserrat_22, 0);
+    lv_obj_set_style_text_color(lbl_circ_angle, lv_color_hex(0xf9f600), 0);
+    lv_label_set_text(lbl_circ_angle, "Start Angle:");
+
+    lv_obj_t *ta_circ_angle = lv_textarea_create(cont_right);
+    lv_obj_set_pos(ta_circ_angle, 300, 430); // Shifted down
+    lv_obj_set_size(ta_circ_angle, 150, 50);
+    lv_obj_set_style_text_font(ta_circ_angle, &lv_font_montserrat_22, 0);
+    lv_textarea_set_one_line(ta_circ_angle, true);
+    lv_textarea_set_text(ta_circ_angle, "0.0");
+
+
+    // --- BOTTOM SECTION: CONTROLS ---
+    lv_obj_t *cont_bot = lv_obj_create(parent);
+    lv_obj_set_pos(cont_bot, 0, 590); // Corrected to 590 (580 + 10)original 550 abs pos
+    lv_obj_set_size(cont_bot, 1280, 150); 
+    lv_obj_set_style_bg_opa(cont_bot, LV_OPA_TRANSP, 0); 
+    lv_obj_set_style_border_width(cont_bot, 0, 0);
+
+    // Apply Button
+    lv_obj_t *btn_apply = lv_btn_create(cont_bot);
+    lv_obj_set_pos(btn_apply, 30, 0); // Relative Y=0 in container
+    lv_obj_set_size(btn_apply, 200, 80);
+    add_style_button_tyle1(btn_apply);
+    
+    lv_obj_t *lbl_apply = lv_label_create(btn_apply);
+    lv_obj_center(lbl_apply);
+    add_style_button_label(lbl_apply); // Use DRO style label
+    lv_label_set_text(lbl_apply, "APPLY");
+
+    // Cancel Button
+    lv_obj_t *btn_cancel = lv_btn_create(cont_bot);
+    lv_obj_set_pos(btn_cancel, 280, 0);
+    lv_obj_set_size(btn_cancel, 200, 80);
+    add_style_button_tyle1(btn_cancel);
+    lv_obj_set_style_bg_color(btn_cancel, lv_color_hex(0x606060), 0); // Override for Grey
+    
+    lv_obj_t *lbl_cancel = lv_label_create(btn_cancel);
+    lv_obj_center(lbl_cancel);
+    add_style_button_label(lbl_cancel);
+    lv_label_set_text(lbl_cancel, "CANCEL");
+
+    // Increment Buttons (Center)
+    lv_obj_t *btn_prev = lv_btn_create(cont_bot);
+    lv_obj_set_pos(btn_prev, 580, 0);
+    lv_obj_set_size(btn_prev, 150, 80);
+    add_style_button_tyle1(btn_prev);
+
+    lv_obj_t *lbl_prev = lv_label_create(btn_prev);
+    lv_obj_center(lbl_prev);
+    add_style_button_label(lbl_prev);
+    lv_label_set_text(lbl_prev, "< PREV");
+
+    lv_obj_t *btn_next = lv_btn_create(cont_bot);
+    lv_obj_set_pos(btn_next, 760, 0);
+    lv_obj_set_size(btn_next, 150, 80);
+    add_style_button_tyle1(btn_next);
+
+    lv_obj_t *lbl_next = lv_label_create(btn_next);
+    lv_obj_center(lbl_next);
+    add_style_button_label(lbl_next);
+    lv_label_set_text(lbl_next, "NEXT >");
+
+    // Back Button (Right)
+    lv_obj_t *btn_back = lv_btn_create(cont_bot);
+    lv_obj_set_pos(btn_back, 1010, 0);
+    lv_obj_set_size(btn_back, 200, 80);
+    add_style_button_tyle1(btn_back);
+    lv_obj_set_style_bg_color(btn_back, lv_color_hex(0xFF0000), 0); // Override for Red
+    lv_obj_add_event_cb(btn_back, event_handler_back_to_main, LV_EVENT_CLICKED, NULL);
+    
+    lv_obj_t *lbl_back = lv_label_create(btn_back);
+    lv_obj_center(lbl_back);
+    add_style_button_label(lbl_back);
+    lv_label_set_text(lbl_back, "BACK");
+}
+
+void create_tool_library_tab_ui(lv_obj_t *parent) {
+    lv_obj_remove_flag(parent, LV_OBJ_FLAG_SCROLLABLE);
+
+    // --- TOP SECTION: GRAPHIC & DETAILS (0-400px) ---
+    lv_obj_t *cont_top = lv_obj_create(parent);
+    lv_obj_set_pos(cont_top, 0, 0);
+    lv_obj_set_size(cont_top, 1280, 400); 
+    lv_obj_set_style_border_width(cont_top, 0, 0);
+    lv_obj_set_style_bg_opa(cont_top, LV_OPA_TRANSP, 0);
+
+    // 1. Tool Graphic (Center)
+    // Placeholder Box for now
+    lv_obj_t *rect_tool = lv_obj_create(cont_top);
+    lv_obj_set_pos(rect_tool, 400, 50);
+    lv_obj_set_size(rect_tool, 480, 300);
+    lv_obj_set_style_bg_color(rect_tool, lv_color_hex(0x202020), 0);
+    lv_obj_set_style_border_color(rect_tool, lv_color_hex(0x808080), 0);
+    lv_obj_set_style_border_width(rect_tool, 2, 0);
+    
+    // Label for Graphic
+    lv_obj_t *lbl_graphic = lv_label_create(rect_tool);
+    lv_obj_center(lbl_graphic);
+    lv_label_set_text(lbl_graphic, "Tool Graphic Placeholder");
+    lv_obj_set_style_text_color(lbl_graphic, lv_color_hex(0xFFFFFF), 0);
+
+    // 2. Left Side Inputs
+    // Tool Number
+    lv_obj_t *lbl_tool_no = lv_label_create(cont_top);
+    lv_obj_set_pos(lbl_tool_no, 50, 50);
+    lv_label_set_text(lbl_tool_no, "Tool Number:");
+    lv_obj_set_style_text_font(lbl_tool_no, &lv_font_montserrat_22, 0);
+    lv_obj_set_style_text_color(lbl_tool_no, lv_color_hex(0xf9f600), 0);
+
+    lv_obj_t *ta_tool_no = lv_textarea_create(cont_top);
+    lv_obj_set_pos(ta_tool_no, 50, 90);
+    lv_obj_set_size(ta_tool_no, 200, 50);
+    lv_obj_set_style_text_font(ta_tool_no, &lv_font_montserrat_22, 0);
+    lv_textarea_set_one_line(ta_tool_no, true);
+    lv_textarea_set_text(ta_tool_no, "1");
+
+    // Tool Type Dropdown
+    lv_obj_t *lbl_type = lv_label_create(cont_top);
+    lv_obj_set_pos(lbl_type, 50, 160);
+    lv_label_set_text(lbl_type, "Tool Type:");
+    lv_obj_set_style_text_font(lbl_type, &lv_font_montserrat_22, 0);
+    lv_obj_set_style_text_color(lbl_type, lv_color_hex(0xf9f600), 0);
+
+    lv_obj_t *dd_type = lv_dropdown_create(cont_top);
+    lv_obj_set_pos(dd_type, 50, 200);
+    lv_obj_set_width(dd_type, 250);
+    lv_dropdown_set_options(dd_type, "End Mill\nBall End Mill\nDrill\nCenter Drill\nReamer\nTap\nFace Mill\nChamfer Mill\nCountersink\nBoring Bar\nThread Mill\nSlot Cutter\nFly Cutter");
+    lv_obj_set_style_text_font(dd_type, &lv_font_montserrat_22, 0);
+
+    // 3. Right Side Inputs
+    // Diameter
+    lv_obj_t *lbl_dia = lv_label_create(cont_top);
+    lv_obj_set_pos(lbl_dia, 950, 50);
+    lv_label_set_text(lbl_dia, "Diameter:");
+    lv_obj_set_style_text_font(lbl_dia, &lv_font_montserrat_22, 0);
+    lv_obj_set_style_text_color(lbl_dia, lv_color_hex(0xf9f600), 0);
+
+    lv_obj_t *ta_dia = lv_textarea_create(cont_top);
+    lv_obj_set_pos(ta_dia, 950, 90);
+    lv_obj_set_size(ta_dia, 200, 50);
+    lv_obj_set_style_text_font(ta_dia, &lv_font_montserrat_22, 0);
+    lv_textarea_set_one_line(ta_dia, true);
+    lv_textarea_set_text(ta_dia, "10.0");
+
+    // Length
+    lv_obj_t *lbl_len = lv_label_create(cont_top);
+    lv_obj_set_pos(lbl_len, 950, 160);
+    lv_label_set_text(lbl_len, "Length:");
+    lv_obj_set_style_text_font(lbl_len, &lv_font_montserrat_22, 0);
+    lv_obj_set_style_text_color(lbl_len, lv_color_hex(0xf9f600), 0);
+
+    lv_obj_t *ta_len = lv_textarea_create(cont_top);
+    lv_obj_set_pos(ta_len, 950, 200);
+    lv_obj_set_size(ta_len, 200, 50);
+    lv_obj_set_style_text_font(ta_len, &lv_font_montserrat_22, 0);
+    lv_textarea_set_one_line(ta_len, true);
+    lv_textarea_set_text(ta_len, "50.0");
+
+
+    // --- BOTTOM SECTION: TABLE (410-800px) ---
+    lv_obj_t *cont_bot = lv_obj_create(parent);
+    lv_obj_set_pos(cont_bot, 0, 410);
+    lv_obj_set_size(cont_bot, 1280, 390);
+    lv_obj_set_style_bg_opa(cont_bot, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(cont_bot, 0, 0);
+
+    // Table
+    lv_obj_t *table = lv_table_create(cont_bot);
+    lv_obj_set_pos(table, 50, 0);
+    lv_obj_set_size(table, 1180, 300);
+    lv_table_set_col_cnt(table, 5);
+    lv_table_set_col_width(table, 0, 100); // ID
+    lv_table_set_col_width(table, 1, 300); // Type
+    lv_table_set_col_width(table, 2, 200); // Dia
+    lv_table_set_col_width(table, 3, 200); // Len
+    lv_table_set_col_width(table, 4, 300); // Material
+
+    lv_table_set_cell_value(table, 0, 0, "ID");
+    lv_table_set_cell_value(table, 0, 1, "Type");
+    lv_table_set_cell_value(table, 0, 2, "Diameter");
+    lv_table_set_cell_value(table, 0, 3, "Length");
+    lv_table_set_cell_value(table, 0, 4, "Material");
+
+    // Dummy Data
+    lv_table_set_cell_value(table, 1, 0, "1");
+    lv_table_set_cell_value(table, 1, 1, "End Mill");
+    lv_table_set_cell_value(table, 1, 2, "10.0");
+    lv_table_set_cell_value(table, 1, 3, "50.0");
+    lv_table_set_cell_value(table, 1, 4, "HSS");
+
+    // Controls Bottom
+    lv_obj_t *btn_add = lv_btn_create(cont_bot);
+    lv_obj_set_pos(btn_add, 50, 310);
+    lv_obj_set_size(btn_add, 150, 60);
+    lv_obj_t *lbl_add = lv_label_create(btn_add);
+    lv_label_set_text(lbl_add, "ADD");
+    lv_obj_center(lbl_add);
+
+    lv_obj_t *btn_save = lv_btn_create(cont_bot);
+    lv_obj_set_pos(btn_save, 220, 310);
+    lv_obj_set_size(btn_save, 150, 60);
+    lv_obj_set_style_bg_color(btn_save, lv_color_hex(0x00FF00), 0);
+    lv_obj_t *lbl_save = lv_label_create(btn_save);
+    lv_label_set_text(lbl_save, "SAVE");
+    lv_obj_center(lbl_save);
 }
 
 void create_screen_main() {
@@ -1112,8 +1496,8 @@ void create_screen_main() {
                     }
                 }
                 {
-                    // Tab 2
-                    lv_obj_t *obj = lv_tabview_add_tab(parent_obj, "Tab 2");
+                    // Functions Tab (Was Tab 2)
+                    lv_obj_t *obj = lv_tabview_add_tab(parent_obj, "Functions");
                     add_style_tab_style(obj);
                     lv_obj_set_style_text_color(obj, lv_color_hex(0xf9f600), LV_PART_MAIN | LV_STATE_DEFAULT);
                     
@@ -1124,20 +1508,11 @@ void create_screen_main() {
                         lv_obj_add_event_cb(tab_button, tab_button_event_handler, LV_EVENT_CLICKED, (void*)1);
                     }
                     
-                    {
-                        lv_obj_t *parent_obj = obj;
-                        {
-                            // Add a label to make the tab visible
-                            lv_obj_t *obj = lv_label_create(parent_obj);
-                            lv_obj_set_pos(obj, 50, 50);
-                            lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-                            lv_label_set_text(obj, "Tab 2 Content");
-                        }
-                    }
+                    create_functions_tab_ui(obj);
                 }
                 {
-                    // Tab 3
-                    lv_obj_t *obj = lv_tabview_add_tab(parent_obj, "Tab 3");
+                    // Tool Library Tab (Was Tab 3)
+                    lv_obj_t *obj = lv_tabview_add_tab(parent_obj, "Tools");
                     add_style_tab_style(obj);
                     lv_obj_set_style_text_color(obj, lv_color_hex(0xf9f600), LV_PART_MAIN | LV_STATE_DEFAULT);
                     
@@ -1148,16 +1523,7 @@ void create_screen_main() {
                         lv_obj_add_event_cb(tab_button, tab_button_event_handler, LV_EVENT_CLICKED, (void*)2);
                     }
                     
-                    {
-                        lv_obj_t *parent_obj = obj;
-                        {
-                            // Add a label to make the tab visible
-                            lv_obj_t *obj = lv_label_create(parent_obj);
-                            lv_obj_set_pos(obj, 50, 50);
-                            lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-                            lv_label_set_text(obj, "Tab 3 Content");
-                        }
-                    }
+                    create_tool_library_tab_ui(obj);
                 }
                 {
                     // E-Screw Tab
