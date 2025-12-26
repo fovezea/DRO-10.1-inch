@@ -102,39 +102,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
     }
 }
 
-/**
- * @brief Check if ESP-Hosted slave device is alive and ready
- * @return esp_err_t ESP_OK if slave is ready, ESP_FAIL otherwise
- */
-static esp_err_t check_slave_device_ready(void)
-{
-    esp_hosted_coprocessor_fwver_t fwver = {0};
-    esp_err_t ret = esp_hosted_get_coprocessor_fwversion(&fwver);
-    
-    if (ret == ESP_OK) {
-        ESP_LOGI(TAG, "Slave device is ready - FW version: %d.%d.%d", 
-                 fwver.major1, fwver.minor1, fwver.patch1);
-        
-        // Check for version compatibility warning
-        ESP_LOGI(TAG, "Host ESP-Hosted version: 2.7.0");
-        if (fwver.major1 != 2 || fwver.minor1 != 7) {
-            ESP_LOGW(TAG, "WARNING: Version mismatch detected!");
-            ESP_LOGW(TAG, "  Host version: 2.7.x");
-            ESP_LOGW(TAG, "  Slave version: %d.%d.x", fwver.major1, fwver.minor1);
-            ESP_LOGW(TAG, "  This may cause communication issues.");
-            ESP_LOGW(TAG, "  Consider updating slave firmware to match host version.");
-        }
-        return ESP_OK;
-    } else {
-        ESP_LOGW(TAG, "Slave device not ready - fwversion check failed: %s", esp_err_to_name(ret));
-        ESP_LOGW(TAG, "This usually means:");
-        ESP_LOGW(TAG, "  1. Transport is not active (slave hasn't sent INIT event)");
-        ESP_LOGW(TAG, "  2. Slave firmware may be incompatible (old version 0.x.x vs host 2.7.x)");
-        ESP_LOGW(TAG, "  3. Slave device may not be powered or connected properly");
-        ESP_LOGW(TAG, "  4. SPI/SDIO communication may be broken");
-        return ESP_FAIL;
-    }
-}
+
 
 /**
  * @brief Initialize WiFi with detailed logging and slave device validation
@@ -254,6 +222,15 @@ static void wifi_scan_task(void *pvParameters)
 {
     vTaskDelay(pdMS_TO_TICKS(2000)); // Wait for WiFi to be ready
     
+    // Verify WiFi is in correct state before scanning
+    ESP_LOGI(TAG, "Ensuring WiFi is in Station Mode and Started...");
+    esp_wifi_set_mode(WIFI_MODE_STA);
+    esp_err_t start_ret = esp_wifi_start();
+    if (start_ret != ESP_OK && start_ret != ESP_ERR_WIFI_MODE) {
+        // ESP_ERR_WIFI_MODE means it's already started/active, which is fine
+        ESP_LOGI(TAG, "esp_wifi_start result: %s", esp_err_to_name(start_ret));
+    }
+
     // Configure scan
     wifi_scan_config_t scan_config = {
         .ssid = NULL,
@@ -277,11 +254,21 @@ static void wifi_scan_task(void *pvParameters)
     }
     
     // Get scan results
-    ap_count = MAX_AP_COUNT;
-    err = esp_wifi_scan_get_ap_records(&ap_count, ap_info);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to get scan results: %s", esp_err_to_name(err));
-        ap_count = 0;
+    // Get scan results
+    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_num(&ap_count));
+    
+    if (ap_count == 0) {
+        ESP_LOGI(TAG, "No APs found during scan.");
+    } else {
+        if (ap_count > MAX_AP_COUNT) {
+            ap_count = MAX_AP_COUNT;
+        }
+
+        err = esp_wifi_scan_get_ap_records(&ap_count, ap_info);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to get scan results: %s", esp_err_to_name(err));
+            ap_count = 0;
+        }
     }
     
     // Print results
@@ -349,23 +336,7 @@ static void ui_tick_task(void *pvParameters)
     }
 }
 
-/**
- * @brief Monitor task to print system information
- */
-static void system_monitor_task(void *pvParameters)
-{
-    while (1) {
-        ESP_LOGI(TAG, "=== System Monitor ===");
-        ESP_LOGI(TAG, "Free heap: %lu bytes", esp_get_free_heap_size());
-        ESP_LOGI(TAG, "Min free heap: %lu bytes", esp_get_minimum_free_heap_size());
-        ESP_LOGI(TAG, "Free internal heap: %lu bytes", esp_get_free_internal_heap_size());
-        ESP_LOGI(TAG, "Task count: %d", uxTaskGetNumberOfTasks());
-        
-        // Display rotation is handled by BSP - no need to check or correct
-        
-        vTaskDelay(pdMS_TO_TICKS(10000)); // Print every 10 seconds
-    }
-}
+
 
 /**
  * @brief Initialize physical display using BSP
@@ -456,11 +427,10 @@ void app_main(void)
     // Create UI tick task for EEZ Studio (slightly higher priority)
     xTaskCreate(ui_tick_task, "ui_tick", 4096, NULL, 5, NULL);
     
-    // Create system monitor task
-    xTaskCreate(system_monitor_task, "system_monitor", 4096, NULL, 1, NULL);
+
     
     // Create delayed WiFi initialization task with slave device health checks
-    // xTaskCreate(wifi_init_task, "wifi_init", 4096, NULL, 2, NULL);
+    xTaskCreate(wifi_init_task, "wifi_init", 4096, NULL, 2, NULL);
 
 
 
@@ -522,85 +492,7 @@ static void wifi_init_task(void *pvParameters)
     vTaskDelay(pdMS_TO_TICKS(5000));
     
     ESP_LOGI(TAG, "Starting delayed WiFi initialization...");
-    
-    // Initialize ESP-Hosted first
-    esp_err_t hosted_init_ret = esp_hosted_init();
-    if (hosted_init_ret != ESP_OK) {
-        ESP_LOGE(TAG, "esp_hosted_init failed: %s", esp_err_to_name(hosted_init_ret));
-        ESP_LOGW(TAG, "Cannot initialize WiFi - ESP-Hosted initialization failed");
-        ESP_LOGW(TAG, "System will continue to operate without WiFi functionality");
-        vTaskDelete(NULL);
-        return;
-    }
-    ESP_LOGI(TAG, "ESP-Hosted initialized successfully");
-    
-    // First, check if slave device is ready with retries
-    const int max_slave_check_retries = 5;
-    const int slave_check_delay_ms = 1000;  // Increased delay to give slave more time
-    bool slave_ready = false;
-    
-    // Try to check if slave is already ready (transport might already be up)
-    ESP_LOGI(TAG, "Checking if slave device is already ready...");
-    if (check_slave_device_ready() == ESP_OK) {
-        slave_ready = true;
-        ESP_LOGI(TAG, "Slave device confirmed ready (transport was already up)");
-    }
-    
-    // If slave not ready, try to connect
-    if (!slave_ready) {
-        ESP_LOGI(TAG, "Slave not ready, attempting initial connection...");
-        ESP_LOGI(TAG, "This will reset the slave device - please ensure it is powered and connected");
-        
-        esp_err_t connect_ret = esp_hosted_connect_to_slave();
-        if (connect_ret == ESP_OK) {
-            ESP_LOGI(TAG, "Connection attempt returned OK, waiting for slave to stabilize...");
-        } else {
-            ESP_LOGW(TAG, "Connection attempt returned: %s", esp_err_to_name(connect_ret));
-            ESP_LOGI(TAG, "This may be normal - transport may need time to establish");
-        }
-        
-        // Give slave significant time to boot after reset (it was just reset by connect_to_slave)
-        // Slave devices typically need 2-5 seconds to fully boot
-        ESP_LOGI(TAG, "Waiting 5 seconds for slave device to boot after reset...");
-        vTaskDelay(pdMS_TO_TICKS(5000));
-        
-        // Now retry checking slave readiness without resetting
-        for (int retry = 0; retry < max_slave_check_retries && !slave_ready; retry++) {
-            ESP_LOGI(TAG, "Checking slave device readiness (attempt %d/%d)...", retry + 1, max_slave_check_retries);
-            
-            // check_slave_device_ready() internally checks transport status via check_transport_up()
-            esp_err_t slave_check = check_slave_device_ready();
-            if (slave_check == ESP_OK) {
-                slave_ready = true;
-                ESP_LOGI(TAG, "Slave device confirmed ready and responding");
-                break;
-            } else {
-                ESP_LOGW(TAG, "Slave not responding: %s (transport may still be establishing)", esp_err_to_name(slave_check));
-            }
-            
-            if (retry < max_slave_check_retries - 1) {
-                ESP_LOGW(TAG, "Slave device not ready, waiting %d ms before next check...", slave_check_delay_ms);
-                vTaskDelay(pdMS_TO_TICKS(slave_check_delay_ms));
-            }
-        }
-    }
-    
-    if (!slave_ready) {
-        ESP_LOGW(TAG, "==========================================");
-        ESP_LOGW(TAG, "Slave device not ready after %d attempts", max_slave_check_retries);
-        ESP_LOGW(TAG, "Possible causes:");
-        ESP_LOGW(TAG, "  1. Slave device (ESP32-C6) not powered");
-        ESP_LOGW(TAG, "  2. SPI connection issues (check wiring)");
-        ESP_LOGW(TAG, "  3. Slave device firmware not running");
-        ESP_LOGW(TAG, "  4. Slave device needs more time to boot");
-        ESP_LOGW(TAG, "Final check: slave device not responding to version query");
-        ESP_LOGW(TAG, "Skipping WiFi initialization - ESP32-C6 slave device not responding");
-        ESP_LOGW(TAG, "System will continue to operate without WiFi functionality");
-        ESP_LOGW(TAG, "==========================================");
-        vTaskDelete(NULL);
-        return;
-    }
-    
+
     /* Initialize WiFi */
     esp_err_t ret = wifi_init();
     

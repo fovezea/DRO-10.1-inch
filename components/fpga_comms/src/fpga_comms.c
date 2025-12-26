@@ -11,10 +11,12 @@
 
 #define TAG "FPGA_COMMS"
 
+#include "dro_pins.h"  // Central Pin Definitions
+
 // UART Configuration
 #define UART_PORT_NUM           UART_NUM_1
-#define TX_PIN                  16
-#define RX_PIN                  17
+#define TX_PIN                  PIN_FPGA_UART_TX
+#define RX_PIN                  PIN_FPGA_UART_RX
 #define BAUD_RATE               9600
 #define UART_BUF_SIZE           1024
 

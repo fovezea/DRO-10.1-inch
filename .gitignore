@@ -20,9 +20,7 @@ managed_components/
 # idf-ci build run output
 build_summary_*.xml
 app_info_*.txt
-size_info_*.txt.vscode/settings.json
-=======
-size_info_*.txt
+    
 
 # VSCode settings
 .vscode/settings.json
