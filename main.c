@@ -102,7 +102,39 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
     }
 }
 
-
+/**
+ * @brief Check if ESP-Hosted slave device is alive and ready
+ * @return esp_err_t ESP_OK if slave is ready, ESP_FAIL otherwise
+ */
+static esp_err_t check_slave_device_ready(void)
+{
+    esp_hosted_coprocessor_fwver_t fwver = {0};
+    esp_err_t ret = esp_hosted_get_coprocessor_fwversion(&fwver);
+    
+    if (ret == ESP_OK) {
+        ESP_LOGI(TAG, "Slave device is ready - FW version: %d.%d.%d", 
+                 fwver.major1, fwver.minor1, fwver.patch1);
+        
+        // Check for version compatibility warning
+        ESP_LOGI(TAG, "Host ESP-Hosted version: 2.7.0");
+        if (fwver.major1 != 2 || fwver.minor1 != 7) {
+            ESP_LOGW(TAG, "WARNING: Version mismatch detected!");
+            ESP_LOGW(TAG, "  Host version: 2.7.x");
+            ESP_LOGW(TAG, "  Slave version: %d.%d.x", fwver.major1, fwver.minor1);
+            ESP_LOGW(TAG, "  This may cause communication issues.");
+            ESP_LOGW(TAG, "  Consider updating slave firmware to match host version.");
+        }
+        return ESP_OK;
+    } else {
+        ESP_LOGW(TAG, "Slave device not ready - fwversion check failed: %s", esp_err_to_name(ret));
+        ESP_LOGW(TAG, "This usually means:");
+        ESP_LOGW(TAG, "  1. Transport is not active (slave hasn't sent INIT event)");
+        ESP_LOGW(TAG, "  2. Slave firmware may be incompatible (old version 0.x.x vs host 2.7.x)");
+        ESP_LOGW(TAG, "  3. Slave device may not be powered or connected properly");
+        ESP_LOGW(TAG, "  4. SPI/SDIO communication may be broken");
+        return ESP_FAIL;
+    }
+}
 
 /**
  * @brief Initialize WiFi with detailed logging and slave device validation
@@ -222,15 +254,6 @@ static void wifi_scan_task(void *pvParameters)
 {
     vTaskDelay(pdMS_TO_TICKS(2000)); // Wait for WiFi to be ready
     
-    // Verify WiFi is in correct state before scanning
-    ESP_LOGI(TAG, "Ensuring WiFi is in Station Mode and Started...");
-    esp_wifi_set_mode(WIFI_MODE_STA);
-    esp_err_t start_ret = esp_wifi_start();
-    if (start_ret != ESP_OK && start_ret != ESP_ERR_WIFI_MODE) {
-        // ESP_ERR_WIFI_MODE means it's already started/active, which is fine
-        ESP_LOGI(TAG, "esp_wifi_start result: %s", esp_err_to_name(start_ret));
-    }
-
     // Configure scan
     wifi_scan_config_t scan_config = {
         .ssid = NULL,
@@ -254,21 +277,11 @@ static void wifi_scan_task(void *pvParameters)
     }
     
     // Get scan results
-    // Get scan results
-    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_num(&ap_count));
-    
-    if (ap_count == 0) {
-        ESP_LOGI(TAG, "No APs found during scan.");
-    } else {
-        if (ap_count > MAX_AP_COUNT) {
-            ap_count = MAX_AP_COUNT;
-        }
-
-        err = esp_wifi_scan_get_ap_records(&ap_count, ap_info);
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to get scan results: %s", esp_err_to_name(err));
-            ap_count = 0;
-        }
+    ap_count = MAX_AP_COUNT;
+    err = esp_wifi_scan_get_ap_records(&ap_count, ap_info);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to get scan results: %s", esp_err_to_name(err));
+        ap_count = 0;
     }
     
     // Print results
@@ -424,9 +437,9 @@ void app_main(void)
     axis_mapping_init();
 
     /* Initialize FPGA Comms */
-    // if (fpga_comms_init() != ESP_OK) {
-    //     ESP_LOGE(TAG, "Failed to initialize FPGA Comms");
-    // }
+    if (fpga_comms_init() != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize FPGA Comms");
+    }
     
     /* Initialize DRO System */
     if (dro_init() == ESP_OK) {
@@ -444,7 +457,7 @@ void app_main(void)
     xTaskCreate(ui_tick_task, "ui_tick", 4096, NULL, 5, NULL);
     
     // Create system monitor task
-    // xTaskCreate(system_monitor_task, "system_monitor", 4096, NULL, 1, NULL);
+    xTaskCreate(system_monitor_task, "system_monitor", 4096, NULL, 1, NULL);
     
     // Create delayed WiFi initialization task with slave device health checks
     xTaskCreate(wifi_init_task, "wifi_init", 4096, NULL, 2, NULL);

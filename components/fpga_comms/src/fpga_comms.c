@@ -9,14 +9,14 @@
 #include "esp_log.h"
 #include <string.h>
 
-#define TAG "FPGA_COMMS"
+#include "dro_pins.h"
 
-#include "dro_pins.h"  // Central Pin Definitions
+#define TAG "FPGA_COMMS"
 
 // UART Configuration
 #define UART_PORT_NUM           UART_NUM_1
-#define TX_PIN                  PIN_FPGA_UART_TX
-#define RX_PIN                  PIN_FPGA_UART_RX
+#define TX_PIN                  PIN_FPGA_UART_TX  // Previously 16 (Conflict with SDIO)
+#define RX_PIN                  PIN_FPGA_UART_RX  // Previously 17 (Conflict with SDIO)
 #define BAUD_RATE               9600
 #define UART_BUF_SIZE           1024
 
