@@ -103,7 +103,6 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
 }
 
 
-
 /**
  * @brief Initialize WiFi with detailed logging and slave device validation
  * @return esp_err_t ESP_OK on success, ESP_FAIL on failure
