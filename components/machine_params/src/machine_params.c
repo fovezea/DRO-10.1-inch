@@ -11,6 +11,7 @@
 static float g_leadscrew_pitch = DEFAULT_LEADSCREW_PITCH_MM;
 static uint32_t g_motor_steps = DEFAULT_MOTOR_STEPS_PER_REV;
 static uint32_t g_encoder_counts = DEFAULT_ENCODER_COUNTS_PER_REV;
+static bool g_is_els_present = true;
 
 esp_err_t machine_params_init(void) {
     nvs_handle_t nvs_handle;
@@ -43,8 +44,17 @@ esp_err_t machine_params_init(void) {
     // Read encoder counts
     err = nvs_get_u32(nvs_handle, "enc_counts", &g_encoder_counts);
     if (err != ESP_OK) {
-        ESP_LOGW(TAG, "Encoder counts not found, using default: %lu", DEFAULT_ENCODER_COUNTS_PER_REV);
         g_encoder_counts = DEFAULT_ENCODER_COUNTS_PER_REV;
+    }
+
+    // Read ELS presence
+    uint8_t els_present_u8;
+    err = nvs_get_u8(nvs_handle, "els_present", &els_present_u8);
+    if (err == ESP_OK) {
+        g_is_els_present = (els_present_u8 != 0);
+    } else {
+        ESP_LOGW(TAG, "ELS presence not found, using default: YES");
+        g_is_els_present = true; 
     }
     
     nvs_close(nvs_handle);
@@ -121,6 +131,34 @@ esp_err_t machine_params_set_encoder_counts(uint32_t counts) {
         if (err == ESP_OK) {
             g_encoder_counts = counts;
             ESP_LOGI(TAG, "Encoder counts set to %lu", counts);
+        }
+    }
+    
+    nvs_close(nvs_handle);
+    return err;
+}
+
+// ----------------------------------------------------
+// ELS Presence
+// ----------------------------------------------------
+
+bool machine_params_get_is_els_present(void) {
+    return g_is_els_present;
+}
+
+esp_err_t machine_params_set_is_els_present(bool present) {
+    nvs_handle_t nvs_handle;
+    esp_err_t err;
+    
+    err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs_handle);
+    if (err != ESP_OK) return err;
+    
+    err = nvs_set_u8(nvs_handle, "els_present", present ? 1 : 0);
+    if (err == ESP_OK) {
+        err = nvs_commit(nvs_handle);
+        if (err == ESP_OK) {
+            g_is_els_present = present;
+            ESP_LOGI(TAG, "ELS Present set to %s", present ? "YES" : "NO");
         }
     }
     

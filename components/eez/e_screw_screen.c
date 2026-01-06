@@ -83,7 +83,7 @@ static void work_mode_dropdown_event(lv_event_t *e) {
     uint16_t selected = lv_dropdown_get_selected(dd);
     
     // Send work mode command
-    uint8_t payload[1] = {selected};
+    // uint8_t payload[1] = {selected};
     // CMD_SET_WORK_MODE not yet implemented in protocol_defs.h
     // fpga_comms_send_cmd(CMD_SET_WORK_MODE, payload, 1);
 }
@@ -176,26 +176,39 @@ void create_e_screw_screen(lv_obj_t *parent_obj) {
     lv_obj_set_style_text_font(title, &lv_font_montserrat_24, 0);
     lv_obj_set_style_text_color(title, lv_color_hex(0xFFFFFF), 0);
     
+    // ELS Present Switch
+    lv_obj_t *els_present_label = lv_label_create(parent_obj);
+    lv_label_set_text(els_present_label, "ELS Hardware:");
+    lv_obj_set_pos(els_present_label, 20, 70);
+    lv_obj_set_style_text_font(els_present_label, &lv_font_montserrat_20, 0);
+
+    lv_obj_t *els_present_switch = lv_switch_create(parent_obj);
+    lv_obj_set_pos(els_present_switch, 180, 65);
+    if (machine_params_get_is_els_present()) {
+        lv_obj_add_state(els_present_switch, LV_STATE_CHECKED);
+    }
+    // TODO: Add callback to save setting and toggle visibility of other controls
+
     // Work Mode Dropdown
     lv_obj_t *mode_label = lv_label_create(parent_obj);
     lv_label_set_text(mode_label, "Work Mode:");
-    lv_obj_set_pos(mode_label, 20, 70);
+    lv_obj_set_pos(mode_label, 280, 70); // Shifted right
     lv_obj_set_style_text_font(mode_label, &lv_font_montserrat_20, 0);
     
     work_mode_dropdown = lv_dropdown_create(parent_obj);
     lv_dropdown_set_options(work_mode_dropdown, "Screw\\nFollow\\nConical");
-    lv_obj_set_pos(work_mode_dropdown, 200, 65);
-    lv_obj_set_size(work_mode_dropdown, 200, 40);
+    lv_obj_set_pos(work_mode_dropdown, 410, 65); // Shifted right
+    lv_obj_set_size(work_mode_dropdown, 150, 40);
     lv_obj_add_event_cb(work_mode_dropdown, work_mode_dropdown_event, LV_EVENT_VALUE_CHANGED, NULL);
     
     // Enable Switch
     lv_obj_t *enable_label = lv_label_create(parent_obj);
     lv_label_set_text(enable_label, "Enable:");
-    lv_obj_set_pos(enable_label, 450, 70);
+    lv_obj_set_pos(enable_label, 600, 70); // Shifted right
     lv_obj_set_style_text_font(enable_label, &lv_font_montserrat_20, 0);
     
     enable_switch = lv_switch_create(parent_obj);
-    lv_obj_set_pos(enable_switch, 580, 65);
+    lv_obj_set_pos(enable_switch, 690, 65); // Shifted right
     lv_obj_add_event_cb(enable_switch, enable_switch_event, LV_EVENT_VALUE_CHANGED, NULL);
     
     // Z-Axis Ratio Section
