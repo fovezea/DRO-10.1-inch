@@ -49,6 +49,21 @@ This project supports two distinct hardware backends sharing the same Frontend a
 - **FPGA**: Xilinx Spartan-7 (Spartan Edge Accelerator Board)
 - **Orientation**: Landscape mode (270-degree rotation)
 
+### 🔌 Hardware Connections (UART)
+
+The system relies on a **Cross-Wired** UART connection between the Frontend and Backend.
+
+| Device | Type | Port | TX Pin | RX Pin | Note |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Frontend** | ESP32-P4 | UART1 | **GPIO 50** | **GPIO 51** | Fixed in `dro_pins.h` |
+| **Backend** | ESP32 (DevKitC) | UART1 | **GPIO 17** | **GPIO 16** | Legacy Standard |
+| **Backend** | ESP32-S3 | UART1 | **GPIO 1** | **GPIO 2** | Modern Standard |
+
+**Wiring Guide**:
+- Frontend **TX (50)** -> Backend **RX**
+- Frontend **RX (51)** -> Backend **TX**
+- **GND** -> **GND**
+
 ## 📦 Project Structure
 
 ```

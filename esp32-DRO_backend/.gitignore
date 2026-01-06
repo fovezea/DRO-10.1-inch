@@ -1,0 +1,15 @@
+# ESP-IDF
+/build/
+sdkconfig
+sdkconfig.old
+
+# Python
+__pycache__/
+*.pyc
+
+# VS Code
+.vscode/
+
+# Component Manager
+/managed_components/
+dependencies.lock

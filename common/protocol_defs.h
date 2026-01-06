@@ -21,4 +21,10 @@
 #define ENABLE_ON       0x01
 #define ENABLE_OFF      0x00
 
+// Reporting Protocol (Backend -> Frontend)
+// Format: [SYNC_1] [SYNC_2] [X(4)] [Y(4)] [Z(4)] [W(4)] [C(4)] [FOOTER]
+#define REPORT_SYNC_1   0xAA
+#define REPORT_SYNC_2   0x55
+#define REPORT_FOOTER   0x0A
+
 #endif // PROTOCOL_DEFS_H
