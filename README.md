@@ -26,6 +26,9 @@ This project provides a complete Digital Readout (DRO) system for milling machin
 ## 🔧 Hardware Configuration
 
 - **Main Board**: ESP32-P4 (JC8012P4A1C 10.1-inch board)
+
+![frontend](res/1.jpg)
+
 - **Display**: 1280x800 MIPI-DSI LCD (JD9365 controller)
 - **Touch**: GSL3680 capacitive touch controller
 - **FPGA**: Xilinx Spartan-7 (Spartan Edge Accelerator Board)
