@@ -1,6 +1,6 @@
 #include "e_screw_screen.h"
 #include "fpga_comms.h"
-#include "fpga_protocol.h"
+#include "protocol_defs.h"
 #include "machine_params.h"
 #include "screw_calc.h"
 #include "cone_calc.h"
@@ -75,7 +75,7 @@ static void enable_switch_event(lv_event_t *e) {
     
     // Send enable command
     uint8_t payload[1] = {enabled ? 1 : 0};
-    fpga_comms_send_cmd(CMD_SET_ENABLE, payload, 1);
+    fpga_comms_send_cmd(CMD_ENABLE_AXIS, payload, 1);
 }
 
 static void work_mode_dropdown_event(lv_event_t *e) {
@@ -84,7 +84,8 @@ static void work_mode_dropdown_event(lv_event_t *e) {
     
     // Send work mode command
     uint8_t payload[1] = {selected};
-    fpga_comms_send_cmd(CMD_SET_WORK_MODE, payload, 1);
+    // CMD_SET_WORK_MODE not yet implemented in protocol_defs.h
+    // fpga_comms_send_cmd(CMD_SET_WORK_MODE, payload, 1);
 }
 
 static void z_axis_dropdown_event(lv_event_t *e) {

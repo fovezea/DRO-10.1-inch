@@ -1,5 +1,5 @@
 #include "fpga_comms.h"
-#include "fpga_protocol.h"
+#include "protocol_defs.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
@@ -15,9 +15,9 @@
 
 // UART Configuration
 #define UART_PORT_NUM           UART_NUM_1
-#define TX_PIN                  PIN_FPGA_UART_TX  // Previously 16 (Conflict with SDIO)
-#define RX_PIN                  PIN_FPGA_UART_RX  // Previously 17 (Conflict with SDIO)
-#define BAUD_RATE               9600
+#define TX_PIN                  PIN_FPGA_UART_TX
+#define RX_PIN                  PIN_FPGA_UART_RX
+// BAUD_RATE is now defined in protocol_defs.h (115200)
 #define UART_BUF_SIZE           1024
 
 // Task Configuration
@@ -120,7 +120,14 @@ static void fpga_comms_task(void *arg)
     while (1) {
         // 1. Check for commands to send
         if (xQueueReceive(g_cmd_queue, &cmd, 0) == pdTRUE) {
-            uint16_t tx_len = fpga_build_packet(tx_buf, cmd.cmd_id, cmd.payload, cmd.len);
+            // Simple packet format: [Opcode] [Payload...]
+            // No headers, footers, or CRC for now as per PROTOCOL.md basic examples
+            tx_buf[0] = cmd.cmd_id;
+            if (cmd.len > 0) {
+                memcpy(&tx_buf[1], cmd.payload, cmd.len);
+            }
+            uint16_t tx_len = 1 + cmd.len;
+            
             uart_write_bytes(UART_PORT_NUM, (const char *)tx_buf, tx_len);
             ESP_LOGD(TAG, "Sent Cmd: 0x%02X", cmd.cmd_id);
         }
@@ -142,11 +149,7 @@ static void fpga_comms_task(void *arg)
     vTaskDelete(NULL);
 }
 
-// Simple state machine for parsing could go here.
-// For now, we will just count bytes or look for headers if we were implementing RX fully.
-// The roadmap says "Phase 3: State Synchronization" is next, so for now RX might just be for ACKs.
 static void process_incoming_byte(uint8_t byte)
 {
     // Placeholder for RX parsing logic
-    // We would look for 0xAA 0x55 ...
 }

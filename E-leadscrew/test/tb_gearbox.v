@@ -12,6 +12,8 @@ module tb_gearbox;
 
     // Instantiate the Unit Under Test (UUT)
     top #(
+        .CLK_FREQ(100000000),
+        .BAUD_RATE(115200),
         .HEARTBEAT_MS(1) // Fast heartbeat for simulation
     ) uut (
         .clk(clk),
@@ -23,11 +25,12 @@ module tb_gearbox;
         .step_out_1(step_1),
         .dir_out_1(dir_1),
         .step_out_2(step_2),
-        .dir_out_2(dir_2)
+        .dir_out_2(dir_2),
+        .led_test()
     );
 
-    // Clock generation (25MHz = 40ns period)
-    always #20 clk = ~clk;
+    // Clock generation (100MHz = 10ns period)
+    always #5 clk = ~clk;
 
     // Encoder emulation task
     task generate_quadrature;
@@ -44,8 +47,8 @@ module tb_gearbox;
         end
     endtask
     
-    // UART Byte Send Task (9600 baud = 104166 ns per bit)
-    localparam BIT_PERIOD = 104166;
+    // UART Byte Send Task (115200 baud = ~8680 ns per bit)
+    localparam BIT_PERIOD = 8680;
     
     task send_uart_byte;
         input [7:0] data;

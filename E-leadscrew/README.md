@@ -1,58 +1,79 @@
-# Electronic Leadscrew / Gearbox (FPGA)
+# E-leadscrew (Spartan-7)
 
-This project implements a **Dual-Axis Electronic Gearbox** on an **EG4S20 FPGA** (MLKPAI-FMin01). It reads a quadrature encoder input and generates Step/Direction signals for two independent motors at programmable ratios.
+## Project Overview
+**E-leadscrew** is a pure FPGA implementation of a dual-axis electronic gearbox (leadscrew) controller. It is designed to read a quadrature encoder input (e.g., from a lathe spindle) and generate synchronized Step/Direction signals for two independent stepper motors.
 
-## Key Features
-*   **Dual Axis**: Supports two independent output axes driven by a single encoder input.
-*   **Digital PLL Architecture**: Uses Period Measurement + Frequency Synthesis to generate smooth output pulses, even when multiplying the frequency (e.g., 2:1 ratio).
-*   **Position Locking**: Continuously tracks the phase error to ensure zero long-term drift.
-*   **UART Configuration**: Control gear ratios and enable/disable axes on-the-fly via UART.
+This version is optimized for the **Xilinx Spartan-7** FPGA on the **Spartan Edge Accelerator Board**.
 
-## UART Control Protocol
-*   **Baud Rate**: 9600
-*   **Axis IDs**: `0` = Axis 1, `1` = Axis 2
+### Key Features
+*   **Synchronized Motion:** Digital PLL architecture ensures zero long-term drift between input and output.
+*   **Dual Axis Support:** Independent gear ratios for Axis 1 (e.g., Carriage) and Axis 2 (e.g., Cross-slide).
+*   **High Performance:** Running at 100MHz system clock with 64-bit precision math.
+*   **Live Configuration:** Change gear ratios and enable/disable axes in real-time via UART.
+*   **Robust I/O:** Glitch filtering on encoder inputs and buffered UART communication.
 
-### 1. Set Gear Ratio (Command 0x55)
-Sets the Numerator (N) and Denominator (D) for a specific axis.
-*   **Format**: 6 Bytes
-    ```
-    [0x55] [AxisID] [NumH] [NumL] [DenH] [DenL]
-    ```
-*   **Example**: Set Axis 1 to 2:1 Ratio (Output = 2x Input)
-    *   Send: `0x55 0x00 0x00 0x02 0x00 0x01`
+## Hardware Requirements
+*   **FPGA Board:** [Seeed Studio Spartan Edge Accelerator Board](https://wiki.seeedstudio.com/Spartan-Edge-Accelerator-Board/) (Xilinx Spartan-7 XC7S15).
+*   **Encoder:** 5V Quadrature Encoder (A/B phases).
+*   **Motor Drivers:** Standard Step/Dir stepper motor drivers (e.g., TB6600, DM542).
+*   **Power Supply:** 5V via USB-C or 8-17V via VIN.
 
-### 2. Enable/Disable Axis (Command 0x56)
-Enables or disables the output for a specific axis.
-*   **Format**: 3 Bytes
-    ```
-    [0x56] [AxisID] [Enable]
-    ```
-*   **Enable**: `1` = On, `0` = Off.
-*   **Example**: Disable Axis 2
-    *   Send: `0x56 0x01 0x00`
-
-## Pinout (MLKPAI-FMin01)
-Defined in `src/constraints.adc`:
-
-| Signal | Pin | Description |
-| :--- | :--- | :--- |
-| `clk` | **34** | 25MHz System Clock |
-| `rst_n` | **31** | Reset (Button SW2) |
-| `uart_rx` | **16** | UART RX (Connect to ESP32 TX) |
-| `enc_A` | **4** | Encoder A Input |
-| `enc_B` | **5** | Encoder B Input |
-| `step_out_1` | **2** | Axis 1 Step (LED6) |
-| `dir_out_1` | **3** | Axis 1 Dir (LED5) |
-| `step_out_2` | **14** | Axis 2 Step (LED4) |
-| `dir_out_2` | **51** | Axis 2 Dir (LED7) |
-
-## Simulation
-A testbench is provided in `test/tb_gearbox.v`. It verifies:
-1.  Dual axis operation with different ratios.
-2.  Enable/Disable functionality.
-
-**Run with Icarus Verilog:**
-```bash
-iverilog -o gearbox_test test/tb_gearbox.v src/electronic_gearbox.v src/gearbox_channel.v src/quadrature_decoder.v src/period_measure.v src/pulse_gen.v src/uart_rx.v src/uart_config.v src/top.v
-vvp gearbox_test
+## Directory Structure
 ```
+E-leadscrew/
+├── docs/               # Project Documentation
+│   ├── HARDWARE_SPARTAN_EDGE.md  # Pinouts & Board Ref
+│   ├── PROTOCOL.md               # UART Command Ref
+│   └── ...
+├── src/                # Verilog Source Code
+│   ├── top.v           # Top-level Module
+│   ├── constraints.xdc # Pin Constraints
+│   └── ...
+├── test/               # Simulation Testbenches
+├── build.tcl           # Vivado Build Script
+└── README.md           # This file
+```
+
+## Getting Started
+
+### 1. Hardware Setup
+Refer to [docs/HARDWARE_SPARTAN_EDGE.md](./docs/HARDWARE_SPARTAN_EDGE.md) for detailed pin mappings.
+*   Connect Encoder to Arduino D2/D3.
+*   Connect Motor Drivers to D4/D5 (Axis 1) and D6/D7 (Axis 2).
+
+### 2. Simulation
+The project includes a Verilog testbench (`test/tb_gearbox.v`) that simulates the full gearbox logic.
+*   **Requirement:** Icarus Verilog (`iverilog`) and GTKWave.
+*   **Run Simulation:**
+    ```bash
+    # From within the E-leadscrew directory
+    iverilog -o gearbox_test test/tb_gearbox.v src/*.v
+    vvp gearbox_test
+    gtkwave gearbox_test.vcd
+    ```
+
+### 3. Build (Vivado)
+*   **Requirement:** Xilinx Vivado 2018.3 or later.
+*   **Steps:**
+    1.  Launch Vivado.
+    2.  In the Tcl Console, navigate to this directory: `cd [path]/E-leadscrew`
+    3.  Run the build script: `source build.tcl`
+    4.  The generated bitstream will be located in: `vivado_out/E-leadscrew-Spartan.runs/impl_1/top.bit`
+
+### 4. Deploy
+Load the bitstream (`top.bit`) onto the FPGA using either:
+*   **JTAG:** Xilinx Hardware Manager (requires JTAG programmer).
+*   **ESP32:** Copy `top.bit` to the SD card (overlay folder) and use the Spartan Edge Accelerator's ESP32 bootloader.
+
+## Build Configuration
+The project is configured via `src/top.v` parameters:
+*   `CLK_FREQ`: 100,000,000 (100 MHz)
+*   `BAUD_RATE`: 115200
+
+Constraints are defined in `src/constraints.xdc` and target the XC7S15 package.
+
+## License
+[MIT License](../LICENSE)
+
+## Contact/Support
+For issues or feature requests, please open an issue in the repository.

@@ -1,3 +1,5 @@
+`include "generated/protocol.vh"
+
 module uart_config (
     input wire clk,
     input wire reset,
@@ -17,8 +19,7 @@ module uart_config (
     output reg enable_2
 );
 
-    // Protocol: [0x55] [AxisID] [NumH] [NumL] [DenH] [DenL]
-    // Protocol: [0x56] [AxisID] [Enable]
+    // Protocol defined in protocol.vh (generated from common/protocol_defs.h)
     
     localparam WAIT_SYNC = 0;
     localparam GET_AXIS = 1;
@@ -44,7 +45,7 @@ module uart_config (
             if (rx_dv) begin
                 case (state)
                     WAIT_SYNC: begin
-                        if (rx_byte == 8'h55 || rx_byte == 8'h56) begin
+                        if (rx_byte == `CMD_SET_RATIO || rx_byte == `CMD_ENABLE_AXIS) begin
                             cmd_type <= rx_byte;
                             state <= GET_AXIS;
                         end
@@ -52,15 +53,15 @@ module uart_config (
                     
                     GET_AXIS: begin
                         axis_id <= rx_byte;
-                        if (cmd_type == 8'h56)
+                        if (cmd_type == `CMD_ENABLE_AXIS)
                             state <= GET_ENABLE;
                         else
                             state <= GET_NUM_H;
                     end
                     
                     GET_ENABLE: begin
-                        if (axis_id == 0) enable_1 <= (rx_byte != 0);
-                        else if (axis_id == 1) enable_2 <= (rx_byte != 0);
+                        if (axis_id == `AXIS_ID_1) enable_1 <= (rx_byte != `ENABLE_OFF);
+                        else if (axis_id == `AXIS_ID_2) enable_2 <= (rx_byte != `ENABLE_OFF);
                         state <= WAIT_SYNC;
                     end
                     
@@ -84,10 +85,10 @@ module uart_config (
                         
                         // Update specific axis
                         if (temp_num > 0 && (temp_den[15:8] > 0 || rx_byte > 0)) begin
-                            if (axis_id == 0) begin
+                            if (axis_id == `AXIS_ID_1) begin
                                 num_1 <= temp_num;
                                 den_1 <= {temp_den[15:8], rx_byte};
-                            end else if (axis_id == 1) begin
+                            end else if (axis_id == `AXIS_ID_2) begin
                                 num_2 <= temp_num;
                                 den_2 <= {temp_den[15:8], rx_byte};
                             end

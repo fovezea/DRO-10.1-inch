@@ -17,6 +17,7 @@ idf_component_register(
     INCLUDE_DIRS 
         "."
         "generated"
+        "../../common"
     REQUIRES 
         lvgl
         esp_lvgl_port

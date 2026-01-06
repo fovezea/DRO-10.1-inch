@@ -47,19 +47,22 @@ module gearbox_channel (
         end
     end
 
+    parameter CORRECTION_VAL = 100;
+
     // 2. Ratio Calculation & Loop Filter
     reg [31:0] target_period;
     
     always @(posedge clk) begin
         if (period_valid && numerator > 0) begin
             // Calculate Base Period: T_out = T_in * D / N
-            target_period <= (measured_period * denominator) / numerator;
+            // Use 64-bit intermediate to avoid overflow during multiplication
+            target_period <= ( (64'd1 * measured_period) * denominator) / numerator;
             
             // Apply correction (P-Control)
             if (phase_error > 100) 
-                target_period <= target_period - 100; // Speed up
+                target_period <= target_period - CORRECTION_VAL; // Speed up
             else if (phase_error < -100)
-                target_period <= target_period + 100; // Slow down
+                target_period <= target_period + CORRECTION_VAL; // Slow down
         end
     end
 

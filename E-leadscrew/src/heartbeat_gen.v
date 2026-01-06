@@ -9,10 +9,9 @@ module heartbeat_gen (
     input wire signed [31:0] phase_err_2,
     
     // UART Interface
-    output reg tx_start,
+    output reg tx_wr_en,
     output reg [7:0] tx_byte,
-    input wire tx_done,
-    input wire tx_active
+    input wire tx_ready // Connected to !fifo_full
 );
 
     parameter CLK_FREQ = 25000000;
@@ -59,11 +58,11 @@ module heartbeat_gen (
             timer <= 0;
             sending <= 0;
             byte_index <= 0;
-            tx_start <= 0;
+            tx_wr_en <= 0;
             tx_byte <= 0;
             crc <= 0;
         end else begin
-            tx_start <= 0; // Default
+            tx_wr_en <= 0; // Default
             
             if (!sending) begin
                 if (timer >= TIMER_LIMIT) begin
@@ -75,29 +74,29 @@ module heartbeat_gen (
                     timer <= timer + 1;
                 end
             end else begin
-                // Sending State Machine
-                if (!tx_active && !tx_start) begin
+                // Sending State Machine - Writes to FIFO if Ready
+                if (tx_ready) begin
                     case (byte_index)
-                        0: begin tx_byte <= 8'hAA; tx_start <= 1; end
-                        1: begin tx_byte <= 8'h55; tx_start <= 1; end
-                        2: begin tx_byte <= 10;    tx_start <= 1; crc <= calc_crc(10, crc); end
-                        3: begin tx_byte <= 8'h20; tx_start <= 1; crc <= calc_crc(8'h20, crc); end
+                        0: begin tx_byte <= 8'hAA; tx_wr_en <= 1; end
+                        1: begin tx_byte <= 8'h55; tx_wr_en <= 1; end
+                        2: begin tx_byte <= 10;    tx_wr_en <= 1; crc <= calc_crc(10, crc); end
+                        3: begin tx_byte <= 8'h20; tx_wr_en <= 1; crc <= calc_crc(8'h20, crc); end
                         
-                        4: begin tx_byte <= {7'b0, enable_1}; tx_start <= 1; crc <= calc_crc({7'b0, enable_1}, crc); end
-                        5: begin tx_byte <= {7'b0, enable_2}; tx_start <= 1; crc <= calc_crc({7'b0, enable_2}, crc); end
+                        4: begin tx_byte <= {7'b0, enable_1}; tx_wr_en <= 1; crc <= calc_crc({7'b0, enable_1}, crc); end
+                        5: begin tx_byte <= {7'b0, enable_2}; tx_wr_en <= 1; crc <= calc_crc({7'b0, enable_2}, crc); end
                         
-                        6: begin tx_byte <= phase_err_1[31:24]; tx_start <= 1; crc <= calc_crc(phase_err_1[31:24], crc); end
-                        7: begin tx_byte <= phase_err_1[23:16]; tx_start <= 1; crc <= calc_crc(phase_err_1[23:16], crc); end
-                        8: begin tx_byte <= phase_err_1[15:8];  tx_start <= 1; crc <= calc_crc(phase_err_1[15:8], crc); end
-                        9: begin tx_byte <= phase_err_1[7:0];   tx_start <= 1; crc <= calc_crc(phase_err_1[7:0], crc); end
+                        6: begin tx_byte <= phase_err_1[31:24]; tx_wr_en <= 1; crc <= calc_crc(phase_err_1[31:24], crc); end
+                        7: begin tx_byte <= phase_err_1[23:16]; tx_wr_en <= 1; crc <= calc_crc(phase_err_1[23:16], crc); end
+                        8: begin tx_byte <= phase_err_1[15:8];  tx_wr_en <= 1; crc <= calc_crc(phase_err_1[15:8], crc); end
+                        9: begin tx_byte <= phase_err_1[7:0];   tx_wr_en <= 1; crc <= calc_crc(phase_err_1[7:0], crc); end
                         
-                        10: begin tx_byte <= phase_err_2[31:24]; tx_start <= 1; crc <= calc_crc(phase_err_2[31:24], crc); end
-                        11: begin tx_byte <= phase_err_2[23:16]; tx_start <= 1; crc <= calc_crc(phase_err_2[23:16], crc); end
-                        12: begin tx_byte <= phase_err_2[15:8];  tx_start <= 1; crc <= calc_crc(phase_err_2[15:8], crc); end
-                        13: begin tx_byte <= phase_err_2[7:0];   tx_start <= 1; crc <= calc_crc(phase_err_2[7:0], crc); end
+                        10: begin tx_byte <= phase_err_2[31:24]; tx_wr_en <= 1; crc <= calc_crc(phase_err_2[31:24], crc); end
+                        11: begin tx_byte <= phase_err_2[23:16]; tx_wr_en <= 1; crc <= calc_crc(phase_err_2[23:16], crc); end
+                        12: begin tx_byte <= phase_err_2[15:8];  tx_wr_en <= 1; crc <= calc_crc(phase_err_2[15:8], crc); end
+                        13: begin tx_byte <= phase_err_2[7:0];   tx_wr_en <= 1; crc <= calc_crc(phase_err_2[7:0], crc); end
                         
-                        14: begin tx_byte <= crc;  tx_start <= 1; end
-                        15: begin tx_byte <= 8'h0A; tx_start <= 1; end
+                        14: begin tx_byte <= crc;  tx_wr_en <= 1; end
+                        15: begin tx_byte <= 8'h0A; tx_wr_en <= 1; end
                         
                         16: begin sending <= 0; end // Done
                     endcase
