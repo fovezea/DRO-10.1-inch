@@ -4,10 +4,25 @@ This project provides a complete Digital Readout (DRO) system for milling machin
 
 ## 🏗️ System Architecture
 
-- **Frontend (ESP32-P4)**: Handles all business logic, coordinate systems, geometric calculations, and UI rendering.
-- **Backend (ESP32)**: Acts as a passive data pipe, streaming raw encoder values.
-- **FPGA (Xilinx Spartan-7)**: Handles high-speed real-time motor control for the Electronic Leadscrew (ELS) functions.
 - **Communication**: UART (115200 baud) for FPGA control; ESP-NOW/WiFi for wireless encoder connectivity.
+
+## 🏗️ Flexible Architecture
+
+This project supports two distinct hardware backends sharing the same Frontend and Protocol:
+
+1. **FPGA Backend (Current ELS Focus)**:
+    - **Hardware**: Spartan Edge Accelerator Board.
+    - **Connection**: All Encoders (Spindle + 5 Axes) and Steppers connect **directly to the FPGA headers**.
+    - **Data Flow**: P4 Frontend <-> FPGA (UART). Onboard ESP32 is unused (except for firmware updates).
+    - **Use Case**: High-performance Electronic Leadscrew + DRO.
+
+2. **ESP32 Backend (Future/Alternative)**:
+    - **Hardware**: Standard ESP32/ESP32-S3.
+    - **Connection**: Encoders connect to ESP32 PCNT (Pulse Counter) pins.
+    - **Data Flow**: P4 Frontend <-> ESP32 Backend (UART).
+    - **Use Case**: Cost-effective DRO-only system (no ELS).
+
+*Note: The Frontend implementation is identical for both, as they share the same communication protocol.*
 
 - **FPGA board**: Spartan Edge Accelerator Board
 

@@ -8,6 +8,8 @@ This roadmap defines the development of the **Digital Readout (DRO) HMI**. The d
 
 * **Role**: Contains **ALL** application logic, mathematics, and user interaction flows.
 * **Responsibilities**:
+* **Role**: Contains **ALL** application logic, mathematics, and user interaction flows.
+* **Responsibilities**:
   * Coordinate System Math (ABS/INC, Work Offsets).
   * Geometric Calculations (PCD, Arcs, Tapers).
   * Unit Conversion & Display Formatting.
@@ -15,19 +17,19 @@ This roadmap defines the development of the **Digital Readout (DRO) HMI**. The d
 
 ### 2. The Backend (ESP32) - *The "Bridge"*
 
+* **Hardware Options**:
+  * **Standalone ESP32**: For DRO-only builds (reads encoders directly).
+  * **Spartan Onboard ESP32**: For ELS builds (bridges data from FPGA).
 * **Role**: A passive data pipe.
 * **Responsibilities**:
-  * Poll hardware encoders.
+  * Poll hardware encoders (or read from FPGA).
   * Stream raw counter values to HMI.
   * No business logic allowed.
 
 ### 3. The FPGA (Electronic Leadscrew) - *The "Muscle"*
 
-* **Role**: Real-time high-speed stepper control (Future Phase).
-* **Hardware**: Xilinx Spartan-7 (Spartan Edge Accelerator Board).
-* **Responsibilities**:
-  * Receive configuration from HMI (Pitch, Feed Rate).
-  * Execute hard-real-time motor synchronization.
+* Receive configuration from HMI (Pitch, Feed Rate).
+* Execute hard-real-time motor synchronization.
 
 ---
 
@@ -35,7 +37,7 @@ This roadmap defines the development of the **Digital Readout (DRO) HMI**. The d
 
 ### Phase 1: Core Readout (The "Dashboard")
 
-*Status: 🚧 In Progress*
+> **Status**: 🚧 In Progress
 
 **Goal**: A high-performance, ISA-101 compliant visualization of position.
 
@@ -85,7 +87,7 @@ This roadmap defines the development of the **Digital Readout (DRO) HMI**. The d
 
 ### Phase 4: Settings & Metrology
 
-*Status: ⏳ Pending*
+> **Status**: ⏳ Pending
 
 **Goal**: Configuration screens for machine accuracy.
 
@@ -98,7 +100,7 @@ This roadmap defines the development of the **Digital Readout (DRO) HMI**. The d
 
 ### Phase 5: Electronic Leadscrew (ELS Integration)
 
-*Status: 🔮 Future / FPGA*
+> **Status**: 🔮 Future / FPGA
 
 **Goal**: HMI control panel for the FPGA subsystem.
 
