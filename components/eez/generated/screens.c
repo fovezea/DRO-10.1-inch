@@ -103,8 +103,17 @@ static void tab_button_event_handler(lv_event_t *e) {
         // lv_obj_t *button = lv_event_get_target(e); // Unused
         uint32_t tab_index = (uint32_t)lv_event_get_user_data(e);
         
-        // Manually switch to the selected tab
-        lv_tabview_set_active(objects.obj0, tab_index, LV_ANIM_ON);
+        // Manually switch to the selected tab without sliding animation
+        lv_tabview_set_active(objects.obj0, tab_index, LV_ANIM_OFF);
+    }
+}
+
+static void settings_tab_button_event_handler(lv_event_t *e) {
+    lv_event_code_t event = lv_event_get_code(e);
+    if (event == LV_EVENT_CLICKED) {
+        uint32_t tab_index = (uint32_t)(intptr_t)lv_event_get_user_data(e);
+        // Manually switch to the selected tab without sliding animation
+        lv_tabview_set_active(objects.setting_page, tab_index, LV_ANIM_OFF);
     }
 }
 
@@ -932,7 +941,8 @@ void create_screen_main() {
             lv_obj_set_style_text_color(obj, lv_color_hex(0xf9f600), LV_PART_MAIN | LV_STATE_DEFAULT);
             // Enable clickable tabs and ensure proper touch handling
             lv_obj_add_flag(obj, LV_OBJ_FLAG_CLICKABLE);
-            lv_obj_add_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
+            lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
+            lv_obj_clear_flag(lv_tabview_get_content(obj), LV_OBJ_FLAG_SCROLLABLE);
                         lv_obj_set_style_bg_opa(obj, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
             
             // Ensure tabview is properly configured for touch input
@@ -1704,6 +1714,8 @@ void create_screen_setings_page() {
             lv_tabview_set_tab_bar_position(obj, LV_DIR_TOP);
             lv_tabview_set_tab_bar_size(obj, 60);
             lv_obj_set_style_text_color(obj, lv_color_hex(0xf9f600), LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
+            lv_obj_clear_flag(lv_tabview_get_content(obj), LV_OBJ_FLAG_SCROLLABLE);
             {
                 lv_obj_t *parent_obj = obj;
                 {
@@ -1711,36 +1723,77 @@ void create_screen_setings_page() {
                     lv_obj_t *obj = lv_tabview_add_tab(parent_obj, "Axis 1");
                     objects.axis1_tab = obj;
                     add_style_tab_style(obj);
+                    lv_obj_set_scroll_dir(obj, LV_DIR_VER);
+                    lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLL_ELASTIC);
+
+                    lv_obj_t *tab_bar = lv_tabview_get_tab_bar(objects.setting_page);
+                    lv_obj_t *tab_button = lv_obj_get_child_by_type(tab_bar, 0, &lv_button_class);
+                    if (tab_button) lv_obj_add_event_cb(tab_button, settings_tab_button_event_handler, LV_EVENT_CLICKED, (void*)0);
+
                     create_axis_settings_ui(obj, 0);
                 }
                 {
                     // axis2
                     lv_obj_t *obj = lv_tabview_add_tab(parent_obj, "Axis 2");
                     objects.axis2 = obj;
+                    lv_obj_set_scroll_dir(obj, LV_DIR_VER);
+                    lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLL_ELASTIC);
+
+                    lv_obj_t *tab_bar = lv_tabview_get_tab_bar(objects.setting_page);
+                    lv_obj_t *tab_button = lv_obj_get_child_by_type(tab_bar, 1, &lv_button_class);
+                    if (tab_button) lv_obj_add_event_cb(tab_button, settings_tab_button_event_handler, LV_EVENT_CLICKED, (void*)1);
+
                     create_axis_settings_ui(obj, 1);
                 }
                 {
                     // axis3_tab
                     lv_obj_t *obj = lv_tabview_add_tab(parent_obj, "Axis 3");
                     objects.axis3_tab = obj;
+                    lv_obj_set_scroll_dir(obj, LV_DIR_VER);
+                    lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLL_ELASTIC);
+
+                    lv_obj_t *tab_bar = lv_tabview_get_tab_bar(objects.setting_page);
+                    lv_obj_t *tab_button = lv_obj_get_child_by_type(tab_bar, 2, &lv_button_class);
+                    if (tab_button) lv_obj_add_event_cb(tab_button, settings_tab_button_event_handler, LV_EVENT_CLICKED, (void*)2);
+
                     create_axis_settings_ui(obj, 2);
                 }
                 {
                     // axis4_tab
                     lv_obj_t *obj = lv_tabview_add_tab(parent_obj, "Axis 4");
                     objects.axis4_tab = obj;
+                    lv_obj_set_scroll_dir(obj, LV_DIR_VER);
+                    lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLL_ELASTIC);
+
+                    lv_obj_t *tab_bar = lv_tabview_get_tab_bar(objects.setting_page);
+                    lv_obj_t *tab_button = lv_obj_get_child_by_type(tab_bar, 3, &lv_button_class);
+                    if (tab_button) lv_obj_add_event_cb(tab_button, settings_tab_button_event_handler, LV_EVENT_CLICKED, (void*)3);
+
                     create_axis_settings_ui(obj, 3);
                 }
                 {
                     // axis5_tab
                     lv_obj_t *obj = lv_tabview_add_tab(parent_obj, "Axis 5");
                     objects.axis5_tab = obj;
+                    lv_obj_set_scroll_dir(obj, LV_DIR_VER);
+                    lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLL_ELASTIC);
+
+                    lv_obj_t *tab_bar = lv_tabview_get_tab_bar(objects.setting_page);
+                    lv_obj_t *tab_button = lv_obj_get_child_by_type(tab_bar, 4, &lv_button_class);
+                    if (tab_button) lv_obj_add_event_cb(tab_button, settings_tab_button_event_handler, LV_EVENT_CLICKED, (void*)4);
+
                     create_axis_settings_ui(obj, 4);
                 }
                 {
                     // general_settings_tab
                     lv_obj_t *obj = lv_tabview_add_tab(parent_obj, "General");
                     objects.general_settings_tab = obj;
+                    lv_obj_set_scroll_dir(obj, LV_DIR_VER);
+                    lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLL_ELASTIC);
+
+                    lv_obj_t *tab_bar = lv_tabview_get_tab_bar(objects.setting_page);
+                    lv_obj_t *tab_button = lv_obj_get_child_by_type(tab_bar, 5, &lv_button_class);
+                    if (tab_button) lv_obj_add_event_cb(tab_button, settings_tab_button_event_handler, LV_EVENT_CLICKED, (void*)5);
                     
                     // Return Button for General Tab
                     {
