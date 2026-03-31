@@ -197,12 +197,9 @@ void dro_set_spindle_telemetry(int32_t counts, float rpm) {
     system_state.current_spindle_counts = counts;
     system_state.current_spindle_rpm = rpm;
     
-    // Temporarily hardwire to Axis C (5th Axis) so the user doesn't need to wipe NVS
-    dro_set_raw_counts(DRO_AXIS_C, counts);
-    
     // Route to any user-configured axes
     for (int i = 0; i < DRO_AXIS_COUNT; i++) {
-        if (system_state.axis_configs[i].is_spindle_readout && i != DRO_AXIS_C) {
+        if (system_state.axis_configs[i].is_spindle_readout) {
             dro_set_raw_counts((uint8_t)i, counts);
         }
     }

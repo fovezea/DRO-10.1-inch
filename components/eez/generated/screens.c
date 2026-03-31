@@ -123,6 +123,7 @@ typedef struct {
     lv_obj_t *ta_dist;
     lv_obj_t *lbl_calib_status; // To show "Start Set" or result
     lv_obj_t *dd_resolution;
+    lv_obj_t *sw_is_spindle;
 } axis_settings_ui_t;
 
 static axis_settings_ui_t axis_ui_handles[DRO_AXIS_COUNT];
@@ -285,6 +286,7 @@ static void event_handler_save_axis_settings(lv_event_t *e) {
     bool enabled = lv_obj_has_state(axis_ui_handles[axis_index].sw_enable, LV_STATE_CHECKED);
     uint32_t type = lv_dropdown_get_selected(axis_ui_handles[axis_index].dd_type);
     bool inverted = lv_obj_has_state(axis_ui_handles[axis_index].sw_invert, LV_STATE_CHECKED);
+    bool is_spindle = lv_obj_has_state(axis_ui_handles[axis_index].sw_is_spindle, LV_STATE_CHECKED);
     
     // Parse floats
     const char* txt_ppu = lv_textarea_get_text(axis_ui_handles[axis_index].ta_ppu);
@@ -312,6 +314,7 @@ static void event_handler_save_axis_settings(lv_event_t *e) {
     config.pulses_per_unit = ppu;
     config.gear_ratio = gear;
     config.inverted = inverted;
+    config.is_spindle_readout = is_spindle;
     config.leadscrew_pitch = pitch;
     
     // Save to NVS and Update Runtime
@@ -370,6 +373,19 @@ static void create_axis_settings_ui(lv_obj_t *parent, int axis_index) {
     lv_obj_set_pos(lbl_invert, 410, 22);
     lv_obj_set_style_text_font(lbl_invert, &lv_font_montserrat_22, 0);
     lv_label_set_text(lbl_invert, "Invert Direction");
+
+    // 3.5 Is Spindle Readout
+    lv_obj_t *sw_spindle = lv_switch_create(parent);
+    lv_obj_set_pos(sw_spindle, 600, 20);
+    lv_obj_set_size(sw_spindle, 50, 25);
+    if (config.is_spindle_readout) lv_obj_add_state(sw_spindle, LV_STATE_CHECKED);
+    lv_obj_add_event_cb(sw_spindle, mark_axis_dirty, LV_EVENT_VALUE_CHANGED, (void*)(intptr_t)axis_index);
+    axis_ui_handles[axis_index].sw_is_spindle = sw_spindle;
+    
+    lv_obj_t *lbl_spindle = lv_label_create(parent);
+    lv_obj_set_pos(lbl_spindle, 660, 22);
+    lv_obj_set_style_text_font(lbl_spindle, &lv_font_montserrat_22, 0);
+    lv_label_set_text(lbl_spindle, "Track Spindle Data");
 
     // 4. Pulses Per Unit (Moved down)
     lv_obj_t *ta_ppu = lv_textarea_create(parent);
@@ -1572,8 +1588,8 @@ void tick_screen_main() {
     
     {
         if (objects.obj1) {
-            char new_val_str[32];
-            snprintf(new_val_str, sizeof(new_val_str), "%ld", get_var_active_space_number());
+            char new_val_str[16];
+            snprintf(new_val_str, sizeof(new_val_str), "%ld", (long)get_var_active_space_number());
             const char *cur_val = lv_textarea_get_text(objects.obj1);
             uint32_t max_length = lv_textarea_get_max_length(objects.obj1);
             if (cur_val && strncmp(new_val_str, cur_val, max_length) != 0) {
@@ -1585,8 +1601,8 @@ void tick_screen_main() {
     }
     {
         if (objects.active_tool_number) {
-            char new_val_str[32];
-            snprintf(new_val_str, sizeof(new_val_str), "%ld", get_var_active_tool_number());
+            char new_val_str[16];
+            snprintf(new_val_str, sizeof(new_val_str), "%ld", (long)get_var_active_tool_number());
             const char *cur_val = lv_textarea_get_text(objects.active_tool_number);
             uint32_t max_length = lv_textarea_get_max_length(objects.active_tool_number);
             if (cur_val && strncmp(new_val_str, cur_val, max_length) != 0) {
