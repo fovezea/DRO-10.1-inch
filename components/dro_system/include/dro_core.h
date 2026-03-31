@@ -48,7 +48,8 @@ typedef struct {
     float gear_ratio;       // 1.0 = direct
     float leadscrew_pitch;  // mm per rev
     bool inverted;
-    uint8_t reserved[8];    // Future proofing for NVS
+    bool is_spindle_readout; // NEW: If true, ignore USB axis counts and track spindle directly
+    uint8_t reserved[7];    // Future proofing for NVS
 } dro_axis_config_t;
 
 typedef struct {
@@ -75,6 +76,11 @@ typedef struct {
     dro_mode_t current_mode;
     dro_axis_config_t axis_configs[DRO_AXIS_COUNT]; // Added config
     dro_axis_state_t axes[DRO_AXIS_COUNT];
+    
+    // SPINDLE STATE
+    int32_t current_spindle_counts;
+    float current_spindle_rpm;
+    
     int32_t active_tool_index;
     int32_t active_space_index;
     bool high_precision;
@@ -149,6 +155,12 @@ const dro_system_state_t* dro_get_state(void);
  * This will trigger a recalculation of the position based on axis config (puls/unit, gear, etc.)
  */
 void dro_set_raw_counts(uint8_t axis_index, int32_t counts);
+
+/**
+ * @brief Push telemetry from the Backend Spindle
+ * Will automatically route raw counts to any Axis configured with is_spindle_readout=true
+ */
+void dro_set_spindle_telemetry(int32_t counts, float rpm);
 
 /**
  * @brief DEPRECATED: Use dro_set_raw_counts instead.

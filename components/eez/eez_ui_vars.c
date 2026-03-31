@@ -1,6 +1,6 @@
 #include "generated/vars.h"
 #include "dro_core.h"
-#include "fpga_comms.h"
+#include "frontend_host.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -83,7 +83,5 @@ const char* get_var_mode_text() {
 }
 
 const char* get_var_conn_status_text() {
-    fpga_state_t state;
-    fpga_comms_get_state(&state);
-    return state.is_connected ? "CONNECTED" : "DISCONNECTED";
+    return frontend_usb_is_connected() ? "CONNECTED" : "DISCONNECTED";
 }

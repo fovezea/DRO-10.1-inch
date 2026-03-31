@@ -41,6 +41,7 @@ esp_err_t dro_init(void) {
             system_state.axis_configs[i].pulses_per_unit = 200.0f; 
             system_state.axis_configs[i].gear_ratio = 1.0f;
             system_state.axis_configs[i].inverted = false;
+            system_state.axis_configs[i].is_spindle_readout = false;
             
             // Save default to NVS so it exists next time
             dro_nvs_save_axis_config(i, &system_state.axis_configs[i], sizeof(dro_axis_config_t));
@@ -190,6 +191,21 @@ void dro_set_raw_counts(uint8_t axis_index, int32_t counts) {
     if (axis_index >= DRO_AXIS_COUNT) return;
     system_state.axes[axis_index].raw_counts = (float)counts;
     // dro_update() will handle the recalculation on next tick
+}
+
+void dro_set_spindle_telemetry(int32_t counts, float rpm) {
+    system_state.current_spindle_counts = counts;
+    system_state.current_spindle_rpm = rpm;
+    
+    // Temporarily hardwire to Axis C (5th Axis) so the user doesn't need to wipe NVS
+    dro_set_raw_counts(DRO_AXIS_C, counts);
+    
+    // Route to any user-configured axes
+    for (int i = 0; i < DRO_AXIS_COUNT; i++) {
+        if (system_state.axis_configs[i].is_spindle_readout && i != DRO_AXIS_C) {
+            dro_set_raw_counts((uint8_t)i, counts);
+        }
+    }
 }
 
 void dro_set_raw_position(uint8_t axis_index, float position_mm) {

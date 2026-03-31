@@ -23,7 +23,7 @@ idf_component_register(
         esp_lvgl_port
         esp_wifi_remote
         esp_wifi
-        fpga_comms
+        frontend_usb
         machine_params
         screw_calc
         cone_calc

@@ -21,6 +21,8 @@
 // Contains position data (pulses) dynamically managed by the backend
 typedef struct __attribute__((packed)) {
   uint32_t status_flags;          // e.g., limit switches, alarms
+  int32_t spindle_counts;         // Absolute raw pulses from Spindle Index
+  float spindle_rpm;              // CPU-computed RPM speed
   int32_t axis[NUM_VIRTUAL_AXES]; // Position count per axis
 } hid_input_report_t;
 
@@ -28,10 +30,19 @@ typedef struct __attribute__((packed)) {
 // Contains setup instructions and axis mapping (multiplication factors)
 typedef struct __attribute__((packed)) {
   float mult_axis[NUM_VIRTUAL_AXES]; // The multiplication factors per axis
+  uint16_t max_step_hz[NUM_VIRTUAL_AXES];  // Max permitted frequency before the stepper physically stalls
+  uint16_t acceleration[NUM_VIRTUAL_AXES]; // The step/sec^2 acceleration ramping
   uint8_t track_spindle[NUM_VIRTUAL_AXES]; // Which axes track the spindle
                                            // (boolean or ID mapping)
   uint8_t command_code; // e.g., 1 = Config Update, 2 = Stop, etc.
 } hid_output_report_t;
+
+// Standardized Status Flags for Input Report
+#define STATUS_OVERSPEED_AXIS_0  (1 << 0)
+#define STATUS_OVERSPEED_AXIS_1  (1 << 1)
+#define STATUS_OVERSPEED_AXIS_2  (1 << 2)
+#define STATUS_OVERSPEED_AXIS_3  (1 << 3)
+#define STATUS_OVERSPEED_AXIS_4  (1 << 4)
 
 // Report IDs
 #define REPORT_ID_INPUT 1

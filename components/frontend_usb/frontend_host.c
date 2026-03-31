@@ -9,6 +9,7 @@
 #include "usb/hid_host.h"
 #include "usb/usb_host.h"
 #include "dro_core.h"
+#include "frontend_host.h"
 #include <stdint.h>
 #include <string.h>
 
@@ -16,6 +17,26 @@ static const char *TAG = "FRONTEND_HOST";
 
 static hid_host_device_handle_t backend_handle = NULL;
 static bool device_connected = false;
+
+// Shared Global Output Report for GUI
+static hid_output_report_t global_out_report = {
+    .command_code = 1,
+};
+static bool out_report_needs_update = true;
+
+bool frontend_usb_is_connected(void) {
+    return device_connected;
+}
+
+void frontend_usb_update_els_config(uint8_t target_axis, float mult, bool track, uint16_t accel, uint16_t max_hz) {
+    if (target_axis < NUM_VIRTUAL_AXES) {
+        global_out_report.mult_axis[target_axis] = mult;
+        global_out_report.track_spindle[target_axis] = track ? 1 : 0;
+        global_out_report.acceleration[target_axis] = accel;
+        global_out_report.max_step_hz[target_axis] = max_hz;
+        out_report_needs_update = true;
+    }
+}
 
 // -----------------------------------------------------------------------------
 // EVENT HANDLERS
@@ -47,9 +68,17 @@ void hid_host_interface_callback(hid_host_device_handle_t hid_device_handle,
               }
           }
           
-          // Optionally log for debugging (can be removed later to save CPU)
-          // ESP_LOGD(TAG, "IN Report! 0: %ld, 1: %ld, 2: %ld", in_report->axis[0],
-          //         in_report->axis[1], in_report->axis[2]);
+          // Stream Spindle Telemetry into the specialized tracking handler
+          dro_set_spindle_telemetry(in_report->spindle_counts, in_report->spindle_rpm);
+          
+          // Print Spindle Status at 1Hz (assuming 50Hz report rate)
+          static int spindle_print_divider = 0;
+          spindle_print_divider++;
+          if (spindle_print_divider >= 50) {
+              ESP_LOGI(TAG, "Spindle -> Counts: %ld | Speed: %.1f RPM", 
+                       (long)in_report->spindle_counts, in_report->spindle_rpm);
+              spindle_print_divider = 0;
+          }
         } else {
           ESP_LOGW(TAG, "IN Report Length Mismatch! Expected %d, Got %d",
                    sizeof(hid_input_report_t) + 1, data_length);
@@ -96,38 +125,35 @@ void hid_host_device_event(hid_host_device_handle_t hid_device_handle,
 // -----------------------------------------------------------------------------
 
 void frontend_setup_task(void *pvParameters) {
-  hid_output_report_t out_report = {
-      .command_code = 1,
-  };
-
-  // Example: Map Axis 0 to Spindle with 1.5x multiplier and Axis 1 with 0.5x
+  // Initialize Global Buffer to Safe Defaults
   for (int i = 0; i < NUM_VIRTUAL_AXES; i++) {
-    out_report.mult_axis[i] = 0;
-    out_report.track_spindle[i] = 0;
+    global_out_report.mult_axis[i] = 0;
+    global_out_report.track_spindle[i] = 0;
+    global_out_report.max_step_hz[i] = 0;
+    global_out_report.acceleration[i] = 0;
   }
-  out_report.mult_axis[0] = 1.5f;
-  out_report.track_spindle[0] = 1;
-  out_report.mult_axis[1] = 0.5f;
-  out_report.track_spindle[1] = 1;
 
   // Buffer to hold Report ID + Data
   uint8_t out_buffer[sizeof(hid_output_report_t) + 1];
   out_buffer[0] = REPORT_ID_OUTPUT;
 
   while (1) {
-    if (device_connected && backend_handle != NULL) {
-      ESP_LOGI(TAG, "Frontend sending setup mapping...");
-      memcpy(out_buffer + 1, &out_report, sizeof(hid_output_report_t));
+    if (device_connected && backend_handle != NULL && out_report_needs_update) {
+      ESP_LOGI(TAG, "Frontend sending ELS target mapping to Tracker...");
+      memcpy(out_buffer + 1, &global_out_report, sizeof(hid_output_report_t));
 
       esp_err_t err = hid_class_request_set_report(
           backend_handle, HID_REPORT_TYPE_OUTPUT, REPORT_ID_OUTPUT, out_buffer,
           sizeof(out_buffer));
       if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to send SET_REPORT: %s", esp_err_to_name(err));
+      } else {
+        out_report_needs_update = false; // Successfully sent
       }
     }
 
-    vTaskDelay(pdMS_TO_TICKS(5000)); // Resend every 5s
+    // Process every 100ms so UI feels instantly responsive when updating ratio
+    vTaskDelay(pdMS_TO_TICKS(100)); 
   }
 }
 

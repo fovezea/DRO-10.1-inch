@@ -60,6 +60,7 @@ The system relies on a **Cross-Wired** UART connection between the Frontend and 
 | **Backend** | ESP32-S3 | UART1 | **GPIO 1** | **GPIO 2** | Modern Standard |
 
 **Wiring Guide**:
+
 - Frontend **TX (50)** -> Backend **RX**
 - Frontend **RX (51)** -> Backend **TX**
 - **GND** -> **GND**
@@ -121,3 +122,228 @@ The communication protocol is defined in `common/protocol_defs.h`. Any changes t
 ## 📄 License
 
 This project follows the same license terms as the original ESP-IDF examples.
+
+Absolutely — now that we know **you will NOT use the SD‑card, camera, or LCD**, we can categorize pins into two groups:
+
+✅ **SAFE‑TO‑USE GPIOs** (only routed to the 2×17 connectors)  
+⚠️ **GPIOs YOU MUST AVOID** (because they are connected to other onboard peripherals and could conflict)
+
+The classification below is based entirely on the uploaded schematic contents **ESP32P4模组基础底板 V1.3**. [\[ESP32P4模组基础底板V1.3 \| PDF\]](https://molgroup-my.sharepoint.com/personal/felix_ovezea_molgroup_com/Documents/Microsoft%20Copilot%20%E3%83%81%E3%83%A3%E3%83%83%E3%83%88%20%E3%83%95%E3%82%A1%E3%82%A4%E3%83%AB/ESP32P4%E6%A8%A1%E7%BB%84%E5%9F%BA%E7%A1%80%E5%BA%95%E6%9D%BFV1.3.pdf)
+
+***
+
+# ✅ **Summary**
+
+- Around **24 pins are totally free** and safe to use.
+- The remaining **GPIOs are connected to:**
+  - SD Card interface
+  - Audio codec + I²S
+  - Backlight, LCD\_RST/TE
+  - CSI Camera reset
+  - USB circuitry (download switch)
+  - I²C shared bus
+- These **should NOT be reused** unless you cut resistors or disable peripherals.
+
+***
+
+# ✅ **SAFE‑TO‑USE GPIOs**
+
+These pins have *no internal connections* in the schematic other than the 2×17 headers.
+
+    GPIO00
+    GPIO01
+    GPIO02
+    GPIO03
+    GPIO04
+    GPIO05
+    GPIO06
+    GPIO14
+    GPIO15
+    GPIO16
+    GPIO17
+    GPIO18
+    GPIO19
+    GPIO22
+    GPIO23
+    GPIO24
+    GPIO25
+    GPIO27
+    GPIO28
+    GPIO29
+    GPIO30
+    GPIO31
+    GPIO34
+    GPIO35
+    GPIO45
+    GPIO46
+    GPIO47
+    GPIO48
+    GPIO49
+    GPIO50
+    GPIO51
+    GPIO52
+    GPIO53  (used as audio amp input, but easily ignored if you don't populate amplifier)
+    GPIO54
+
+✅ All of the above are routed **only to connectors** or unused nets in the schematic.  
+✅ These are ideal for your own peripherals.
+
+***
+
+# ⚠️ **GPIOs YOU SHOULD AVOID (Used by board peripherals)**
+
+Below are all ESP32‑P4 pins that are **actively wired to something on the board** (from the schematic).
+
+***
+
+## **⚠️ I²C Bus (shared by codec, touch panel, camera)**
+
+These two *must not be reused*:
+
+    GPIO7 (I2C_SDA)
+    GPIO8 (I2C_SCL)
+
+They feed several devices via level shifter TXS0102.
+
+***
+
+## **⚠️ I²S Audio Codec (ES8311)**
+
+These are hardwired:
+
+    GPIO9
+    GPIO10
+    GPIO11
+    GPIO12
+    GPIO13
+
+If ES8311 is unused, you could reclaim them, but you'd need to ensure the codec is held in reset.
+
+***
+
+## **⚠️ SD Card (TF Card)**
+
+The TF‑card connector directly uses:
+
+    GPIO39  (SD_D1)
+    GPIO40  (SD_D2)
+    GPIO41  (SD_D3)
+    GPIO42  (SD_CMD)
+    GPIO43  (SD_CLK)
+    GPIO44  (SD_DET)
+
+Since you said you **won't use SD**, you *can* reuse these **but be aware** that they are routed through 0Ω resistors.
+
+✅ If needed, I can list which resistors to remove to free each pin.
+
+***
+
+## **⚠️ LCD Display (MIPI + control)**
+
+Although MIPI is not GPIO, *control pins* are real GPIO:
+
+    GPIO20  (LCD_BL – backlight)
+    GPIO32  (LCD_RST)
+    GPIO33  (LCD_TE)
+
+If your board has no screen connected, these are harmless but still routed.
+
+***
+
+## **⚠️ CSI Camera**
+
+CSI reset line:
+
+    GPIO26 (CSI_RST)
+
+Camera not used → this **can** be reused safely (only connected through a MOSFET Q1).
+
+***
+
+## **⚠️ USB Switching / Download Mode**
+
+Used by C6/P4 download switches:
+
+    GPIO37
+    GPIO38
+
+Better to avoid; they are tied into USB/UART mux logic.
+
+***
+
+# ✅ **FINAL CLEAN CATEGORIZED LIST**
+
+***
+
+## ✅ **Completely Safe GPIOs (recommended for custom use)**
+
+(no functional connections except header)
+
+    GPIO00
+    GPIO01
+    GPIO02
+    GPIO03
+    GPIO04
+    GPIO05
+    GPIO06
+    GPIO14
+    GPIO15
+    GPIO16
+    GPIO17
+    GPIO18
+    GPIO19
+    GPIO22
+    GPIO23
+    GPIO24
+    GPIO25
+    GPIO27
+    GPIO28
+    GPIO29
+    GPIO30
+    GPIO31
+    GPIO34
+    GPIO35
+    GPIO45
+    GPIO46
+    GPIO47
+    GPIO48
+    GPIO49
+    GPIO50
+    GPIO51
+    GPIO52
+    GPIO53*
+    GPIO54
+
+\*GPIO53 is connected *to the amplifier input*, but if amplifier is unused, it’s effectively free.
+
+***
+
+## ⚠️ **Pins you must avoid or use with caution**
+
+(connected to onboard peripherals)
+
+    GPIO7   (I2C)
+    GPIO8   (I2C)
+
+    GPIO9   (I2S Audio)
+    GPIO10  (I2S Audio)
+    GPIO11  (I2S Audio)
+    GPIO12  (I2S Audio)
+    GPIO13  (I2S Audio)
+
+    GPIO20  (LCD Backlight)
+    GPIO32  (LCD Reset)
+    GPIO33  (LCD TE)
+
+    GPIO26  (Camera Reset — safe if camera unused)
+
+    GPIO37  (USB Mux)
+    GPIO38  (USB Mux)
+
+    GPIO39  (SD)
+    GPIO40  (SD)
+    GPIO41  (SD)
+    GPIO42  (SD)
+    GPIO43  (SD)
+    GPIO44  (SD)
+  

@@ -1,6 +1,6 @@
 #include "e_screw_screen.h"
-#include "fpga_comms.h"
-#include "protocol_defs.h"
+#include "frontend_host.h"
+#include "dro_core.h"
 #include "machine_params.h"
 #include "screw_calc.h"
 #include "cone_calc.h"
@@ -38,6 +38,8 @@ static lv_obj_t *result_label = NULL;
 
 // Event Handlers
 static void send_ratio_button_event(lv_event_t *e) {
+    bool track = lv_obj_has_state(enable_switch, LV_STATE_CHECKED);
+    
     // Get Z-axis ratio from inputs
     const char *z_num_str = lv_textarea_get_text(z_numerator_input);
     const char *z_den_str = lv_textarea_get_text(z_denominator_input);
@@ -46,11 +48,11 @@ static void send_ratio_button_event(lv_event_t *e) {
     uint32_t z_den = atoi(z_den_str);
     
     if (z_num > 0 && z_den > 0) {
-        // TODO: Send Z-axis ratio to FPGA
-        // uint8_t payload[8];
-        // payload[0] = Z_AXIS_ID;
-        // ... pack z_num and z_den
-        // fpga_comms_send_cmd(CMD_SET_RATIO, payload, len);
+        float ratio = (float)z_num / (float)z_den;
+        uint16_t axis_id = lv_dropdown_get_selected(z_axis_dropdown);
+        
+        // TODO: Map Accel and Max_Hz to actual UI inputs later
+        frontend_usb_update_els_config(axis_id, ratio, track, 50, 30000);
     }
     
     // Get X-axis ratio from inputs (for cone mode)
@@ -61,31 +63,20 @@ static void send_ratio_button_event(lv_event_t *e) {
     uint32_t x_den = atoi(x_den_str);
     
     if (x_num > 0 && x_den > 0) {
-        // TODO: Send X-axis ratio to FPGA
-        // uint8_t payload[8];
-        // payload[0] = X_AXIS_ID;
-        // ... pack x_num and x_den
-        // fpga_comms_send_cmd(CMD_SET_RATIO, payload, len);
+        float ratio = (float)x_num / (float)x_den;
+        uint16_t axis_id = lv_dropdown_get_selected(x_axis_dropdown);
+        frontend_usb_update_els_config(axis_id, ratio, track, 50, 30000);
     }
 }
 
 static void enable_switch_event(lv_event_t *e) {
-    lv_obj_t *sw = lv_event_get_target(e);
-    bool enabled = lv_obj_has_state(sw, LV_STATE_CHECKED);
-    
-    // Send enable command
-    uint8_t payload[1] = {enabled ? 1 : 0};
-    fpga_comms_send_cmd(CMD_ENABLE_AXIS, payload, 1);
+    // Re-trigger the send ratio event to push the new Enable boolean
+    send_ratio_button_event(NULL);
 }
 
 static void work_mode_dropdown_event(lv_event_t *e) {
-    lv_obj_t *dd = lv_event_get_target(e);
-    uint16_t selected = lv_dropdown_get_selected(dd);
-    
-    // Send work mode command
-    // uint8_t payload[1] = {selected};
-    // CMD_SET_WORK_MODE not yet implemented in protocol_defs.h
-    // fpga_comms_send_cmd(CMD_SET_WORK_MODE, payload, 1);
+    // Work mode logic (calculators) does not need to send USB commands directly.
+    // The user must click "Send Ratio" to commit.
 }
 
 static void z_axis_dropdown_event(lv_event_t *e) {
@@ -115,13 +106,13 @@ static void calculate_button_event(lv_event_t *e) {
             
             // Update Z-axis inputs
             char num_buf[16], den_buf[16];
-            snprintf(num_buf, sizeof(num_buf), "%lu", num);
-            snprintf(den_buf, sizeof(den_buf), "%lu", den);
+            snprintf(num_buf, sizeof(num_buf), "%lu", (unsigned long)num);
+            snprintf(den_buf, sizeof(den_buf), "%lu", (unsigned long)den);
             lv_textarea_set_text(z_numerator_input, num_buf);
             lv_textarea_set_text(z_denominator_input, den_buf);
             
             // Update result label
-            lv_label_set_text_fmt(result_label, "Calculated: %lu/%lu for %.3fmm pitch", num, den, pitch_mm);
+            lv_label_set_text_fmt(result_label, "Calculated: %lu/%lu for %.3fmm pitch", (unsigned long)num, (unsigned long)den, pitch_mm);
         }
     } else if (mode == 2) {  // Conical mode
         // Get angle from input
@@ -134,21 +125,21 @@ static void calculate_button_event(lv_event_t *e) {
             
             // Update Z-axis inputs
             char z_num_buf[16], z_den_buf[16];
-            snprintf(z_num_buf, sizeof(z_num_buf), "%lu", z_num);
-            snprintf(z_den_buf, sizeof(z_den_buf), "%lu", z_den);
+            snprintf(z_num_buf, sizeof(z_num_buf), "%lu", (unsigned long)z_num);
+            snprintf(z_den_buf, sizeof(z_den_buf), "%lu", (unsigned long)z_den);
             lv_textarea_set_text(z_numerator_input, z_num_buf);
             lv_textarea_set_text(z_denominator_input, z_den_buf);
             
             // Update X-axis inputs
             char x_num_buf[16], x_den_buf[16];
-            snprintf(x_num_buf, sizeof(x_num_buf), "%lu", x_num);
-            snprintf(x_den_buf, sizeof(x_den_buf), "%lu", x_den);
+            snprintf(x_num_buf, sizeof(x_num_buf), "%lu", (unsigned long)x_num);
+            snprintf(x_den_buf, sizeof(x_den_buf), "%lu", (unsigned long)x_den);
             lv_textarea_set_text(x_numerator_input, x_num_buf);
             lv_textarea_set_text(x_denominator_input, x_den_buf);
             
             // Update result label
             lv_label_set_text_fmt(result_label, "Z: %lu/%lu, X: %lu/%lu for %.1f° angle", 
-                                  z_num, z_den, x_num, x_den, angle_deg);
+                                  (unsigned long)z_num, (unsigned long)z_den, (unsigned long)x_num, (unsigned long)x_den, angle_deg);
         }
     }
 }
@@ -379,7 +370,7 @@ void create_e_screw_screen(lv_obj_t *parent_obj) {
     lv_obj_set_size(motor_steps_input, 100, 40);
     lv_textarea_set_one_line(motor_steps_input, true);
     char ms_buf[16];
-    snprintf(ms_buf, sizeof(ms_buf), "%lu", machine_params_get_motor_steps());
+    snprintf(ms_buf, sizeof(ms_buf), "%lu", (unsigned long)machine_params_get_motor_steps());
     lv_textarea_set_text(motor_steps_input, ms_buf);
     
     // Encoder Counts
@@ -392,7 +383,7 @@ void create_e_screw_screen(lv_obj_t *parent_obj) {
     lv_obj_set_size(encoder_counts_input, 100, 40);
     lv_textarea_set_one_line(encoder_counts_input, true);
     char ec_buf[16];
-    snprintf(ec_buf, sizeof(ec_buf), "%lu", machine_params_get_encoder_counts());
+    snprintf(ec_buf, sizeof(ec_buf), "%lu", (unsigned long)machine_params_get_encoder_counts());
     lv_textarea_set_text(encoder_counts_input, ec_buf);
     
     // Save Settings Button
@@ -452,37 +443,39 @@ void create_e_screw_screen(lv_obj_t *parent_obj) {
 void tick_e_screw_screen(void) {
     if (!status_label) return;  // Not initialized yet
     
-    fpga_state_t state;
-    fpga_comms_get_state(&state);
-    
-    // Update status based on FPGA state
-    if (state.is_connected) {
+    // Update status based on Native USB connection
+    if (frontend_usb_is_connected()) {
+        uint16_t mode = lv_dropdown_get_selected(work_mode_dropdown);
         const char *mode_names[] = {"Screw", "Follow", "Conical"};
-        const char *mode_name = (state.work_mode < 3) ? mode_names[state.work_mode] : "Unknown";
-        lv_label_set_text_fmt(status_label, "Status: Connected | Mode: %s", mode_name);
+        const char *mode_name = (mode < 3) ? mode_names[mode] : "Unknown";
+        
+        lv_label_set_text_fmt(status_label, "Status: Connected (USB) | %s", mode_name);
         lv_obj_set_style_text_color(status_label, lv_color_hex(0x00FF00), 0);
     } else {
         lv_label_set_text(status_label, "Status: Disconnected");
         lv_obj_set_style_text_color(status_label, lv_color_hex(0xFF0000), 0);
     }
     
+    // Fetch Spindle Metrics from DRO core
+    const dro_system_state_t *dr_state = dro_get_state();
+    
     // Update RPM
     if (rpm_label) {
-        lv_label_set_text_fmt(rpm_label, "RPM: %lu", state.current_rpm);
+        lv_label_set_text_fmt(rpm_label, "Spindle RPM: %.1f", dr_state->current_spindle_rpm);
     }
     
     // Update Position
     if (position_label) {
-        lv_label_set_text_fmt(position_label, "Position: %ld", state.current_position);
+        lv_label_set_text_fmt(position_label, "Spindle (Counts): %ld", (long)dr_state->current_spindle_counts);
     }
     
     // Update Enabled Status
     if (enabled_label) {
-        if (state.is_enabled) {
-            lv_label_set_text(enabled_label, "Enabled: Yes");
+        if (lv_obj_has_state(enable_switch, LV_STATE_CHECKED)) {
+            lv_label_set_text(enabled_label, "Enabled: Yes (Tracking)");
             lv_obj_set_style_text_color(enabled_label, lv_color_hex(0x00FF00), 0);
         } else {
-            lv_label_set_text(enabled_label, "Enabled: No");
+            lv_label_set_text(enabled_label, "Enabled: No (Idling)");
             lv_obj_set_style_text_color(enabled_label, lv_color_hex(0xFF6B6B), 0);
         }
     }
