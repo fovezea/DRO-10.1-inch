@@ -30,6 +30,9 @@
 #include "axis_mapping.h"
 #include "dro_axis_helper.h"
 
+// Initialize the USB Frontend Host Component
+extern void init_frontend_host(void);
+
 
 // Include BSP for ESP32-P4 board
 #include "bsp/esp32_p4_function_ev_board.h"
@@ -434,6 +437,9 @@ void app_main(void)
     } else {
         ESP_LOGE(TAG, "DRO System Init Failed");
     }
+
+    /* Initialize USB Frontend Host (Logging Only for now) */
+    init_frontend_host();
 
     /* Create tasks */
 

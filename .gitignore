@@ -24,3 +24,12 @@ app_info_*.txt
 
 # VSCode settings
 .vscode/settings.json
+
+# DRO USB Backend Subproject files
+esp32p4_usb_dro_backend/build/
+esp32p4_usb_dro_backend/managed_components/
+esp32p4_usb_dro_backend/dependencies.lock
+esp32p4_usb_dro_backend/sdkconfig.old
+esp32p4_usb_dro_backend/sdkconfig
+esp32p4_usb_dro_backend/.vscode/
+esp32p4_usb_dro_backend/documentation/

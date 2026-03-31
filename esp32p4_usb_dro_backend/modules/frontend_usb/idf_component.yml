@@ -1,0 +1,4 @@
+dependencies:
+  espressif/usb_host_hid: "^1.0.1"
+  idf:
+    version: ">=5.0"
