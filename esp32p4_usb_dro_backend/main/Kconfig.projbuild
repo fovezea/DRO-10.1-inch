@@ -1,0 +1,15 @@
+menu "E-Leadscrew Hardware Selection"
+    choice BOARD_TARGET
+        prompt "Select Backend Hardware Board"
+        default BOARD_ESP32P4C6_OSPREY
+        
+        config BOARD_ESP32P4C6_OSPREY
+            bool "ESP32-P4C6-osprey Baseboard"
+            
+        config BOARD_ESP32P4_TINY
+            bool "ESP32-P4 WT9932P4-TINY"
+            
+        config BOARD_ESP32S3
+            bool "ESP32-S3 Generic Board"
+    endchoice
+endmenu
