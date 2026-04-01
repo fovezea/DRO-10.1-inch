@@ -21,21 +21,24 @@ This project provides a complete Digital Readout (DRO) and Electronic Leadscrew 
 
 ## 🎛️ The Backend (Hardware Controllers)
 
-This project has completely migrated away from FPGA-based controllers. The Electronic Leadscrew and encoder tracking are now entirely driven by powerful ESP32-series dual-core and quad-core microcontrollers. 
+This project has completely migrated away from FPGA-based controllers. The Electronic Leadscrew and encoder tracking are now entirely driven by powerful ESP32-series dual-core and quad-core microcontrollers.
 
 Because we use a unified **ESP-IDF Kconfig Architecture**, the same `esp32p4_usb_dro_backend` codebase targets multiple backend boards seamlessly by isolating pinouts into a multiplexed Board Support Package (`bsp.h`).
 
-### Supported Backend Hardware:
+### Supported Backend Hardware
 
 #### 1. ESP32-P4C6-osprey Baseboard
+
 The primary high-performance development board.
 ![Osprey P4 Baseboard](res/OspreyPI-P4C6.avif)
 
 #### 2. ESP32-P4 WT9932P4-TINY
+
 A compact ESP32-P4 variant with carefully re-routed USB tracking and bootstrap pins to preserve USB-HID capability without stepper collision.
 ![TINY P4 Board](res/TINY.webp)
 
 #### 3. ESP32-S3 Generic Board
+
 A cost-effective fallback for legacy ESP32-S3 dual-core architectures.
 
 ---
@@ -88,6 +91,23 @@ idf.py build flash monitor
 
 > [!WARNING]
 > Ensure you plug the USB cable into your **FS (Full-Speed / JTAG)** port when flashing the backend board, but plug the display (or PC for testing) into the **HS (High-Speed / OTG)** port for the USB HID protocol to communicate!
+
+## 🛣️ Implementation Roadmap
+
+### ✅ What is Working Right Now
+
+- **The Modern LVGL 9.2 Frontend**: Fast, dark-mode styling, and entirely button-driven navigation optimized to prevent accidental gestures in an industrial shop environment.
+- **Smart Math Core**: Fully decoupled local math inside the display processor handling all PCD, Taper, and ABS/INC calculations.
+- **USB HID Bridge**: A stable, high-speed custom USB HID datalink connecting the Frontend Display directly to the Backend microcontrollers, fully deprecating the legacy FPGA/RS485 setups.
+- **Multi-Board SDK Architecture**: The backend successfully targets custom ESP32-P4 footprints (Osprey, TINY) and legacy S3 boards via a clean Kconfig matrix that automatically patches pinouts at compile-time to prevent hardware conflicts.
+- **Pulse Counting (PCNT)**: Hardware quadrature decoding using the ESP32's native PCNT peripherals to track physical glass scales.
+
+### 🚧 What is Not Yet Working (Next Steps)
+
+- **Physical Stepper Output (RMT / MCPWM)**: Translating the algorithmic ELS math into precise step/dir signals sent directly to the motor drivers.
+- **Open-Loop ELS Mode**: A "blind" threading/turning mode based strictly on the spindle encoder syncing linearly against the step outputs, without demanding linear scale validation.
+- **Closed-Loop Feedback Algorithm**: Dynamic error-correction logic that tracks the exact hardware position off the linear scale against the intended stepper location to guarantee zero missed steps during precision threading modes.
+- **Hardware Machine Interlocks**: Complete bridging of physical Limit Switches and E-Stop pins into the LVGL warning dialogs.
 
 ## 📄 License
 
