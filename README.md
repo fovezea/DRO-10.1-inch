@@ -1,13 +1,14 @@
-# ESP32-P4 DRO (Digital Readout) & Electronic Leadscrew
+# ESP32-P4 DRO (Digital Readout) & Electronic Leadscrew (work in progress) 
 
-This project provides a complete Digital Readout (DRO) and Electronic Leadscrew (ELS) system for milling machines and lathes using the JC8012P4A1C 10.1-inch ESP32-P4 display board. It features a modern, high-performance HMI built with LVGL 9.2, designed with a **"Smart Client, Dumb Backend"** philosophy.
+This project provides a complete Digital Readout (DRO) and Electronic Leadscrew (ELS) system for milling machines and lathes using the JC8012P4A1C 10.1-inch ESP32-P4 display board. It features a modern, high-performance HMI built with LVGL 9.2, designed with a **"Smart Client, Dumb Backend"** philosophy. The board works in horisontal mode without tearing 
 
-## 🏗️ System Architecture
+## 🏗️ System Architecture (not fully implemented yet)
 
 - **Frontend (HMI)**: The 10.1-inch P4 Display calculates all math (ABS/INC, PCD, Tapers, Threading Ratios) locally.
 - **Backend (Hardware Controller)**: A separate ESP32 handles rapid pulse-counting (PCNT) from glass scales/encoders and outputs motor control signals (RMT/MCPWM) to stepper drivers.
 - **Communication**: The system uses a reliable **USB HID** protocol instead of legacy UART to transmit configuration, axis telemetry, and synchronization data between the display and the motion controller.
-
+- **Not all the calculation are finished**: The UI is up but not all buttons have functionality. The communication between frontend and backend works on High Speed USB but shoul be used a dumb cable. Not all cable
+- work 
 ---
 
 ## 🖥️ The Frontend (HMI)
