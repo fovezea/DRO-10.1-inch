@@ -23,6 +23,12 @@ void app_main(void)
     init_backend_device();
 #endif
 
+#ifdef ROLE_GENERATOR
+    ESP_LOGI("MAIN", "Current Role: GENERATOR (HIL Dummy Spindle Simulator)");
+    extern void init_generator_device(void);
+    init_generator_device();
+#endif
+
     // The main application loops cleanly.
     // RTOS tasks started in init_... handle the heavy lifting.
     while(1) {

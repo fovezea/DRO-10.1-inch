@@ -101,13 +101,16 @@ idf.py build flash monitor
 - **Smart Math Core**: Fully decoupled local math inside the display processor handling all PCD, Taper, and ABS/INC calculations.
 - **USB HID Bridge**: A stable, high-speed custom USB HID datalink connecting the Frontend Display directly to the Backend microcontrollers, fully deprecating the legacy FPGA/RS485 setups.
 - **Multi-Board SDK Architecture**: The backend successfully targets custom ESP32-P4 footprints (Osprey, TINY) and legacy S3 boards via a clean Kconfig matrix that automatically patches pinouts at compile-time to prevent hardware conflicts.
+- **Dual Firmware Roles (Kconfig)**: The same codebase flashes as either a full DRO/ELS Backend or a lightweight Spindle Pulse Generator for Hardware-in-the-Loop (HIL) testing — no second repository needed.
 - **Pulse Counting (PCNT)**: Hardware quadrature decoding using the ESP32's native PCNT peripherals to track physical glass scales.
+- **PCNT Infinite-Range Overflow Compensation**: Hardware watchpoint callbacks (`CONFIG_PCNT_ISR_IRAM_SAFE`) maintain a 64-bit software accumulator per axis, giving truly infinite travel range without delta-unwrapping hacks.
+- **50kHz GPTimer DDA Stepper Engine**: A bare-metal hardware timer ISR fires 50,000 times per second to run the Bresenham Digital Differential Analyzer, generating perfectly timed 20µs STEP pulses synchronized to the spindle encoder — all without blocking FreeRTOS.
 
-### 🚧 What is Not Yet Working (Next Steps)
+### 🚧 What is Not Yet Tested / Hardware Pending
 
-- **Physical Stepper Output (RMT / MCPWM)**: Translating the algorithmic ELS math into precise step/dir signals sent directly to the motor drivers.
-- **Open-Loop ELS Mode**: A "blind" threading/turning mode based strictly on the spindle encoder syncing linearly against the step outputs, without demanding linear scale validation.
-- **Closed-Loop Feedback Algorithm**: Dynamic error-correction logic that tracks the exact hardware position off the linear scale against the intended stepper location to guarantee zero missed steps during precision threading modes.
+- **HIL Loopback Validation**: Hardware wiring not yet connected. The `[HIL]` console printouts are in place — pending jumper wires from STEP_X output back into ENC_X_A input.
+- **Open-Loop ELS Mode**: Algorithm is implemented in the GPTimer ISR. Needs physical spindle encoder wired to Spindle PCNT pins to validate.
+- **Closed-Loop Feedback Algorithm**: Architecture is ready. Error-correction logic between `target_steps_generated` and the loopback PCNT axis count to be implemented after HIL validation confirms open-loop is correct.
 - **Hardware Machine Interlocks**: Complete bridging of physical Limit Switches and E-Stop pins into the LVGL warning dialogs.
 
 ## 📄 License

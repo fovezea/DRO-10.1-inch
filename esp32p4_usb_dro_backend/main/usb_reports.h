@@ -7,10 +7,16 @@
 
 // ======================================================================
 // ROLE SELECTION
-// Change this #define to securely toggle between FRONTEND and BACKEND Roles
+// These are now securely driven by the idf.py menuconfig selection
 // ======================================================================
-#define ROLE_BACKEND // Uncomment to build Backend Device Role
-//#define ROLE_FRONTEND // Uncomment to build Frontend Host Role
+#include "sdkconfig.h"
+#if defined(CONFIG_ROLE_BACKEND)
+    #define ROLE_BACKEND
+#elif defined(CONFIG_ROLE_GENERATOR)
+    #define ROLE_GENERATOR
+#elif defined(CONFIG_ROLE_FRONTEND)
+    #define ROLE_FRONTEND
+#endif
 
 // Endpoint addresses for custom HID
 #define EPNUM_HID 1

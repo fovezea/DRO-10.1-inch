@@ -1,4 +1,15 @@
 menu "E-Leadscrew Hardware Selection"
+    choice ROLE_TARGET
+        prompt "Select Firmware Operational Role"
+        default ROLE_BACKEND
+        
+        config ROLE_BACKEND
+            bool "DRO/ELS Backend (Full Motor Control & Display HID)"
+            
+        config ROLE_GENERATOR
+            bool "HIL Test Generator (Produces fake Spindle pulses)"
+    endchoice
+
     choice BOARD_TARGET
         prompt "Select Backend Hardware Board"
         default BOARD_ESP32P4C6_OSPREY

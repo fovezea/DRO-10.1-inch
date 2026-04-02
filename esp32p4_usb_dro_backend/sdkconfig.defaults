@@ -1,1 +1,4 @@
 CONFIG_TINYUSB_HID_COUNT=1
+
+# Place all PCNT ISR callbacks in IRAM so they fire even during USB flash cache flushes
+CONFIG_PCNT_ISR_IRAM_SAFE=y
