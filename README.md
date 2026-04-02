@@ -113,6 +113,44 @@ idf.py build flash monitor
 - **Closed-Loop Feedback Algorithm**: Architecture is ready. Error-correction logic between `target_steps_generated` and the loopback PCNT axis count to be implemented after HIL validation confirms open-loop is correct.
 - **Hardware Machine Interlocks**: Complete bridging of physical Limit Switches and E-Stop pins into the LVGL warning dialogs.
 
+## 📋 Development Log
+
+### 2026-04-02 — ELS Motor Engine & HIL Architecture
+
+#### Board Support & Build System
+
+- Renamed `BOARD_ESP32P4_EVO` → `CONFIG_BOARD_ESP32P4C6_OSPREY` across `Kconfig.projbuild` and `bsp.h` to match the physical board branding.
+- Added a second Kconfig dimension: **`ROLE_TARGET`** — the same binary can now be flashed as either the full `DRO/ELS Backend` or a lightweight `HIL Test Generator` (no second repository needed).
+- Created `generator_main.c`: a FreeRTOS task that outputs realistic A/B quadrature pulses on the Spindle PCNT pins to simulate a spinning lathe chuck during bench testing.
+
+#### PCNT Overflow & Infinite-Range Positioning
+
+- Discovered the ESP32-P4 has only **4 PCNT hardware units** (down from 8 on classic ESP32). Resolved by reserving 3 units for axes (X, Y, Z) and 1 for the Spindle.
+- Replaced naive 16-bit counter reads with a proper **hardware watchpoint + IRAM-safe ISR** overflow system:
+  - `pcnt_unit_add_watch_point()` registers triggers at `±32000`.
+  - A shared `IRAM_ATTR pcnt_overflow_cb()` atomically adjusts a per-unit `int64_t` software accumulator on every hardware overflow.
+  - True absolute position is always `hw_count + overflow_accum` — effectively infinite travel range.
+  - `CONFIG_PCNT_ISR_IRAM_SAFE=y` added to `sdkconfig.defaults` so callbacks fire reliably even during TinyUSB flash cache flushes.
+
+#### 50kHz GPTimer DDA Stepper Engine
+
+- Replaced the old simulated FreeRTOS while-loop step generator with a **real-time bare-metal `gptimer` ISR** running at **50,000 Hz** (20 µs period).
+- Each ISR tick runs the **Bresenham Digital Differential Analyzer (DDA)**:
+  1. Reads the absolute spindle position.
+  2. Computes the movement delta since the last tick.
+  3. Adds `delta × ratio` to a Q16.16 fixed-point phase accumulator.
+  4. When the accumulator overflows `1.0`, fires one 20 µs STEP pulse and updates the DIR pin.
+- This approach delivers mathematically perfect spindle synchronization with zero buffering latency (no RMT buffers, no MCPWM restarts).
+- The FreeRTOS `backend_els_task` is now a slow 100 Hz background loop handling only acceleration ramping, USB telemetry, and HIL printouts.
+
+#### HIL Validation Printouts
+
+- Added `[HIL]` 1 Hz console log comparing `target_steps_generated` vs absolute loopback PCNT count to validate the full open-loop round trip once hardware is wired.
+
+**Status at end of session:** Compiles and runs stable on ESP32-P4. Hardware wiring pending.
+
+---
+
 ## 📄 License
 
 This project follows the same license terms as the original ESP-IDF examples.
