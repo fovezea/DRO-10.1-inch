@@ -71,6 +71,105 @@ DRO-10.1-inch/
 └── README.md                         # This file
 ```
 
+---
+
+## 🔌 Encoder Architecture & Pin Mapping
+
+### Encoder Decoder Architecture
+
+The backend uses a **Hybrid PCNT / Software ISR** strategy to work around the 4-unit PCNT hardware limit on ESP32-P4 and ESP32-S3 silicon:
+
+| Axis | Role | Decoder Method | Reason |
+| :--- | :--- | :--- | :--- |
+| **Spindle** | Threading sync (ELS) | Hardware PCNT | Must be fastest — drives ISR DDA math |
+| **X** | Linear scale | Hardware PCNT | Primary machine axis |
+| **Y** | Linear scale | Hardware PCNT | Primary machine axis |
+| **Z** | Linear scale | Hardware PCNT | Primary machine axis |
+| **W** | Linear scale | **Software GPIO ISR** | No PCNT units remaining; SW ISR sufficient for slow carriage |
+| **C** | Rotary / 4th axis | **Software GPIO ISR** | No PCNT units remaining; SW ISR sufficient |
+
+> [!NOTE]
+> The Software GPIO ISR uses `GPIO_INTR_ANYEDGE` on both A and B pins for full **4X quadrature resolution**, identical to hardware PCNT. It is placed in IRAM (`ESP_INTR_FLAG_IRAM`) and runs safely during USB operations. Typical machine traverse speeds are well under 50kHz, making SW ISR completely reliable.
+
+---
+
+### Encoder Pin Connections by Board
+
+#### ESP32-P4C6-osprey Baseboard
+
+| Signal | Pin A | Pin B | Notes |
+| :--- | :---: | :---: | :--- |
+| **Spindle** | IO0 | IO1 | HW PCNT — Index Z on IO2 |
+| **Axis X** | IO3 | IO4 | HW PCNT |
+| **Axis Y** | IO5 | IO6 | HW PCNT |
+| **Axis Z** | IO14 | IO15 | HW PCNT |
+| **Axis W** | IO16 | IO17 | SW GPIO ISR |
+| **Axis C** | IO18 | IO19 | SW GPIO ISR |
+
+| Stepper | STEP | DIR |
+| :--- | :---: | :---: |
+| **Axis X** | IO23 | IO24 |
+| **Axis Y** | IO25 | IO27 |
+| **Axis Z** | IO28 | IO29 |
+| **Axis W** | IO30 | IO31 |
+| **Axis C** | IO34 | IO35 |
+| **Enable (all)** | IO22 | — |
+
+---
+
+#### ESP32-P4 WT9932P4-TINY
+
+| Signal | Pin A | Pin B | Notes |
+| :--- | :---: | :---: | :--- |
+| **Spindle** | IO0 | IO1 | HW PCNT — Index Z on IO2 |
+| **Axis X** | IO3 | IO4 | HW PCNT |
+| **Axis Y** | IO5 | IO6 | HW PCNT |
+| **Axis Z** | IO14 | IO15 | HW PCNT |
+| **Axis W** | IO16 | IO17 | SW GPIO ISR |
+| **Axis C** | IO18 | IO19 | SW GPIO ISR |
+
+| Stepper | STEP | DIR | Notes |
+| :--- | :---: | :---: | :--- |
+| **Axis X** | IO23 | IO10 | DIR moved from IO24 (USB D+) |
+| **Axis Y** | IO11 | IO27 | STEP moved from IO25 (USB D-) |
+| **Axis Z** | IO28 | IO29 | |
+| **Axis W** | IO30 | IO31 | |
+| **Axis C** | IO34 | IO12 | DIR moved from IO35 (BOOT button) |
+| **Enable (all)** | IO22 | — | |
+
+> [!WARNING]
+> **IO51** on the TINY board is hardwired to the onboard **WS2812 RGB LED**. Do not use IO51 for RS485 or any other output.
+
+---
+
+#### ESP32-S3-DevKitC-1 N16R8
+
+> [!NOTE]
+> **S3 BSP status**: The GPIO mapping below is now implemented in `bsp.h`. Select `BOARD_ESP32S3` in `idf.py menuconfig` then build and flash — no further pin configuration required unless your wiring differs.
+
+**Avoid these pins on the N16R8:**
+- `GPIO 26–37`: Internally wired to Octal-SPI Flash and 8MB PSRAM. **Will crash firmware.**
+- `GPIO 19, 20`: Native USB D+/D-. Needed for HID communication.
+- `GPIO 0, 3, 45, 46`: Boot strapping pins.
+
+| Signal | Pin A | Pin B | Notes |
+| :--- | :---: | :---: | :--- |
+| **Spindle** | IO1 | IO2 | HW PCNT |
+| **Axis X** | IO4 | IO5 | HW PCNT |
+| **Axis Y** | IO6 | IO7 | HW PCNT |
+| **Axis Z** | IO8 | IO9 | HW PCNT |
+| **Axis W** | IO10 | IO11 | SW GPIO ISR |
+| **Axis C** | IO12 | IO13 | SW GPIO ISR |
+
+| Stepper | STEP | DIR |
+| :--- | :---: | :---: |
+| **Axis X** | IO38 | IO39 |
+| **Axis Y** | IO40 | IO41 |
+| **Axis Z** | IO42 | IO43 |
+| **Axis W** | IO44 | IO47 |
+| **Axis C** | IO48 | IO21 |
+| **Enable (all)** | IO14 | — |
+
 ## 💻 Development
 
 ### Compiling the Backend

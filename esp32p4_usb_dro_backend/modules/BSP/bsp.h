@@ -96,46 +96,51 @@
     #define BSP_PIN_ALARM           53
 
 // ============================================================================
-// BOARD: ESP32-S3 Generic Dev Board
+// BOARD: ESP32-S3-DevKitC-1 N16R8
+// Safe GPIO mapping avoiding: 26-37 (Octal SPI PSRAM/Flash),
+//                             19,20 (USB D+/D-), 0,3,45,46 (strapping)
 // ============================================================================
 #elif defined(CONFIG_BOARD_ESP32S3)
 
-    // ⚠️ USER TODO: Configure these pins for the ESP32-S3
-    // Currently filled with dummy values of '255' to prevent compile if unconfigured
-    #define BSP_PIN_SPINDLE_A       255
-    #define BSP_PIN_SPINDLE_B       255
-    #define BSP_PIN_SPINDLE_Z       255
+    // SPINDLE ENCODER (Hardware PCNT)
+    #define BSP_PIN_SPINDLE_A       1
+    #define BSP_PIN_SPINDLE_B       2
+    #define BSP_PIN_SPINDLE_Z       -1  // Not connected
 
-    #define BSP_PIN_ENC_X_A         255
-    #define BSP_PIN_ENC_X_B         255
-    #define BSP_PIN_ENC_Y_A         255
-    #define BSP_PIN_ENC_Y_B         255
-    #define BSP_PIN_ENC_Z_A         255
-    #define BSP_PIN_ENC_Z_B         255
-    #define BSP_PIN_ENC_W_A         255
-    #define BSP_PIN_ENC_W_B         255
-    #define BSP_PIN_ENC_C_A         255
-    #define BSP_PIN_ENC_C_B         255
+    // AXIS ENCODERS
+    #define BSP_PIN_ENC_X_A         4   // Hardware PCNT
+    #define BSP_PIN_ENC_X_B         5
+    #define BSP_PIN_ENC_Y_A         6   // Hardware PCNT
+    #define BSP_PIN_ENC_Y_B         7
+    #define BSP_PIN_ENC_Z_A         8   // Hardware PCNT
+    #define BSP_PIN_ENC_Z_B         9
+    #define BSP_PIN_ENC_W_A         10  // Software GPIO ISR
+    #define BSP_PIN_ENC_W_B         11
+    #define BSP_PIN_ENC_C_A         12  // Software GPIO ISR
+    #define BSP_PIN_ENC_C_B         13
 
-    #define BSP_PIN_STEPPER_ENABLE  255
-    #define BSP_PIN_STEP_X          255
-    #define BSP_PIN_DIR_X           255
-    #define BSP_PIN_STEP_Y          255
-    #define BSP_PIN_DIR_Y           255
-    #define BSP_PIN_STEP_Z          255
-    #define BSP_PIN_DIR_Z           255
-    #define BSP_PIN_STEP_W          255
-    #define BSP_PIN_DIR_W           255
-    #define BSP_PIN_STEP_C          255
-    #define BSP_PIN_DIR_C           255
+    // STEPPER MOTOR DRIVERS
+    #define BSP_PIN_STEPPER_ENABLE  14
+    #define BSP_PIN_STEP_X          38
+    #define BSP_PIN_DIR_X           39
+    #define BSP_PIN_STEP_Y          40
+    #define BSP_PIN_DIR_Y           41
+    #define BSP_PIN_STEP_Z          42
+    #define BSP_PIN_DIR_Z           43
+    #define BSP_PIN_STEP_W          44
+    #define BSP_PIN_DIR_W           47
+    #define BSP_PIN_STEP_C          48
+    #define BSP_PIN_DIR_C           21
 
-    #define BSP_PIN_LIMIT_X         255
-    #define BSP_PIN_LIMIT_Y         255
-    #define BSP_PIN_LIMIT_Z         255
-    #define BSP_PIN_LIMIT_W         255
-    #define BSP_PIN_LIMIT_C         255
-    #define BSP_PIN_ESTOP           255
-    #define BSP_PIN_ALARM           255
+    // LIMIT SWITCHES / ALARMS
+    #define BSP_PIN_LIMIT_X         15
+    #define BSP_PIN_LIMIT_Y         16
+    #define BSP_PIN_LIMIT_Z         17
+    #define BSP_PIN_LIMIT_W         18
+    #define BSP_PIN_LIMIT_C         -1  // Not connected
+    #define BSP_PIN_ESTOP           -1  // Not connected
+    #define BSP_PIN_ALARM           -1  // Not connected
+
 
 #else
     #error "NO E-LEADSCREW BOARD TARGET SELECTED IN MENUCONFIG!"

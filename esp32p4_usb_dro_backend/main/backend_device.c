@@ -23,12 +23,14 @@ static const char *TAG = "BACKEND_DEV";
 // -----------------------------------------------------------------------------
 typedef struct {
     bool enabled;
+    bool use_sw_isr;          // true = GPIO software ISR, false = hardware PCNT
     int pin_a;
     int pin_b;
     pcnt_unit_handle_t pcnt_unit;
     pcnt_channel_handle_t pcnt_chan_a;
     pcnt_channel_handle_t pcnt_chan_b;
-    volatile int64_t overflow_accum; // Software 64-bit absolute accumulator
+    volatile int64_t overflow_accum; // Used by hardware PCNT overflow callback
+    volatile int64_t sw_counter;     // Used by software GPIO ISR
 } axis_handle_t;
 
 static axis_handle_t axes[NUM_VIRTUAL_AXES];
@@ -63,16 +65,18 @@ static void init_encoders(void) {
     // Basic setup from BSP for X, Y, Z, W 
     memset(axes, 0, sizeof(axes));
     
-    // In our HIL test, these PCNT pins will be physically wired to our Stepper Output pins!
-    axes[0].enabled = true; axes[0].pin_a = BSP_PIN_ENC_X_A; axes[0].pin_b = BSP_PIN_ENC_X_B;
-    axes[1].enabled = true; axes[1].pin_a = BSP_PIN_ENC_Y_A; axes[1].pin_b = BSP_PIN_ENC_Y_B;
-    axes[2].enabled = true; axes[2].pin_a = BSP_PIN_ENC_Z_A; axes[2].pin_b = BSP_PIN_ENC_Z_B;
-    axes[3].enabled = false; axes[3].pin_a = BSP_PIN_ENC_W_A; axes[3].pin_b = BSP_PIN_ENC_W_B; // DISABLED: ESP32-P4 only has 4 PCNT units total!
-    axes[4].enabled = false; axes[4].pin_a = BSP_PIN_ENC_C_A; axes[4].pin_b = BSP_PIN_ENC_C_B;
+    // Axes 0-2: Hardware PCNT (fast, DMA-backed)
+    axes[0].enabled = true; axes[0].use_sw_isr = false; axes[0].pin_a = BSP_PIN_ENC_X_A; axes[0].pin_b = BSP_PIN_ENC_X_B;
+    axes[1].enabled = true; axes[1].use_sw_isr = false; axes[1].pin_a = BSP_PIN_ENC_Y_A; axes[1].pin_b = BSP_PIN_ENC_Y_B;
+    axes[2].enabled = true; axes[2].use_sw_isr = false; axes[2].pin_a = BSP_PIN_ENC_Z_A; axes[2].pin_b = BSP_PIN_ENC_Z_B;
+    // Axes 3-4: Software GPIO ISR (slower axes, no PCNT unit needed)
+    axes[3].enabled = true; axes[3].use_sw_isr = true;  axes[3].pin_a = BSP_PIN_ENC_W_A; axes[3].pin_b = BSP_PIN_ENC_W_B;
+    axes[4].enabled = true; axes[4].use_sw_isr = true;  axes[4].pin_a = BSP_PIN_ENC_C_A; axes[4].pin_b = BSP_PIN_ENC_C_B;
 
     int enabled_count = 0;
     for (int i = 0; i < NUM_VIRTUAL_AXES; i++) {
         if (!axes[i].enabled) continue;
+        if (axes[i].use_sw_isr) continue; // SW ISR axes are set up separately
         enabled_count++;
 
         ESP_LOGI(TAG, "Initializing PCNT Axis %d on pins %d, %d", i, axes[i].pin_a, axes[i].pin_b);
@@ -157,7 +161,57 @@ static void init_encoders(void) {
     ESP_ERROR_CHECK(pcnt_unit_clear_count(spindle_pcnt_unit));
     ESP_ERROR_CHECK(pcnt_unit_start(spindle_pcnt_unit));
 
-    ESP_LOGI(TAG, "Encoders initialized. Enabled hardware scales: %d", enabled_count);
+    ESP_LOGI(TAG, "Hardware PCNT encoders initialized.");
+}
+
+// =============================================================================
+// SOFTWARE GPIO ISR QUADRATURE DECODER (for axes W and C)
+// Handles ANYEDGE interrupts on both A and B pins for full 4X resolution.
+// The ISR reads the companion pin to determine direction.
+// =============================================================================
+static void IRAM_ATTR sw_encoder_isr_handler(void *arg) {
+    axis_handle_t *ax = (axis_handle_t *)arg;
+
+    int a = gpio_get_level(ax->pin_a);
+    int b = gpio_get_level(ax->pin_b);
+
+    // Standard Gray-code quadrature decode:
+    // Rising A: B=0 → CW (+), B=1 → CCW (-)
+    // Rising B: A=1 → CW (+), A=0 → CCW (-)
+    // (Falling edges are the inverse, handled symmetrically by XOR logic)
+    if (a == b) {
+        ax->sw_counter++;
+    } else {
+        ax->sw_counter--;
+    }
+}
+
+static void init_sw_encoders(void) {
+    // Install a shared GPIO ISR service (only call once)
+    gpio_install_isr_service(ESP_INTR_FLAG_IRAM); // IRAM flag = ISR in IRAM for cache safety
+
+    for (int i = 0; i < NUM_VIRTUAL_AXES; i++) {
+        if (!axes[i].enabled || !axes[i].use_sw_isr) continue;
+
+        ESP_LOGI(TAG, "Initializing SW ISR Axis %d on pins A=%d, B=%d", i, axes[i].pin_a, axes[i].pin_b);
+
+        axes[i].sw_counter = 0;
+
+        // Configure both A and B as inputs with ANYEDGE interrupts
+        gpio_config_t enc_conf = {
+            .intr_type    = GPIO_INTR_ANYEDGE,
+            .mode         = GPIO_MODE_INPUT,
+            .pull_up_en   = GPIO_PULLUP_ENABLE,
+            .pull_down_en = GPIO_PULLDOWN_DISABLE,
+            .pin_bit_mask = (1ULL << axes[i].pin_a) | (1ULL << axes[i].pin_b),
+        };
+        gpio_config(&enc_conf);
+
+        // Register the same ISR handler for both pins, passing the axis struct as context
+        gpio_isr_handler_add(axes[i].pin_a, sw_encoder_isr_handler, (void *)&axes[i]);
+        gpio_isr_handler_add(axes[i].pin_b, sw_encoder_isr_handler, (void *)&axes[i]);
+    }
+    ESP_LOGI(TAG, "SW ISR encoders initialized.");
 }
 
 // -----------------------------------------------------------------------------
@@ -353,13 +407,20 @@ void backend_els_task(void *pvParameters) {
             if (actual_mult[i] < target_mult) actual_mult[i] = target_mult;
         }
 
-        // Read Local Axis Encoders — absolute position = hw_count + 64-bit overflow
+        // Read axis encoder - branch based on hardware type
         if (axes[i].enabled) {
-            int hw_count = 0;
-            ESP_ERROR_CHECK(pcnt_unit_get_count(axes[i].pcnt_unit, &hw_count));
-            int64_t abs_count = axes[i].overflow_accum + hw_count;
+            int64_t abs_count;
+            if (axes[i].use_sw_isr) {
+                // SW GPIO ISR path: counter is a plain int64_t, no overflow wrapping needed
+                abs_count = axes[i].sw_counter;
+            } else {
+                // Hardware PCNT path: combine hw register + 64-bit overflow accumulator
+                int hw_count = 0;
+                ESP_ERROR_CHECK(pcnt_unit_get_count(axes[i].pcnt_unit, &hw_count));
+                abs_count = axes[i].overflow_accum + hw_count;
+            }
             in_report.axis[i] = (int32_t)abs_count; // truncated for HID
-            
+
             // HIL VALIDATION PRINTOUT 1HZ
             if (hil_print_counter >= 100 && active_setup.track_spindle[i]) {
                 ESP_LOGI(TAG, "[HIL] Axis %d -> Target Generated: %ld | Loopback Abs: %lld | Discrepancy: %lld", 
@@ -401,7 +462,8 @@ const uint8_t hid_configuration_descriptor[] = {
 void init_backend_device(void) {
   ESP_LOGI(TAG, "Initializing TinyUSB HID Device for ELS Backend...");
 
-  init_encoders();
+  init_encoders();       // Hardware PCNT for X, Y, Z + Spindle
+  init_sw_encoders();    // Software GPIO ISR for W and C
   init_stepper_pins();
   init_els_gptimer();
 
