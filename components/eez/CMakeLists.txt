@@ -30,8 +30,3 @@ idf_component_register(
         axis_mapping
         dro_system
 )
-
-# Add EEZ Studio generated files
-# When you export from EEZ Studio, replace the example files with your actual generated files:
-# SRCS "eez_ui_action.c" "generated/your_ui.c" "generated/your_assets.c"
-# INCLUDE_DIRS "generated" 

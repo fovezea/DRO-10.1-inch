@@ -21,7 +21,7 @@ list(APPEND public_requires esp_mm)
 
 ENDIF ()
 
-list(APPEND public_requires freertos pthread newlib )
+list(APPEND public_requires freertos pthread )
 
 IF (${IDF_TARGET} STREQUAL "esp32p4")
 

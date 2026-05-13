@@ -373,9 +373,7 @@ static esp_err_t isp_get_output_frame_type(cam_ctlr_color_t ctlr_color, isp_colo
     case CAM_CTLR_COLOR_YUV420:
         *isp_color = ISP_COLOR_YUV420;
         break;
-    case CAM_CTLR_COLOR_YUV422:
-        *isp_color = ISP_COLOR_YUV422;
-        break;
+
     default:
         ret = ESP_ERR_NOT_SUPPORTED;
         break;

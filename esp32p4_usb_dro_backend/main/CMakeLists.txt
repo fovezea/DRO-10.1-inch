@@ -1,5 +1,5 @@
 idf_component_register(
     SRCS "main.c" "backend_device.c" "generator_main.c"
     INCLUDE_DIRS "." "../modules/BSP"
-    REQUIRES "esp_tinyusb" "usb" "esp_driver_pcnt" "esp_timer" "driver"
+    REQUIRES "esp_tinyusb" "usb" "esp_driver_pcnt" "esp_timer" "driver" "esp_driver_gpio" "esp_driver_gptimer"
 )

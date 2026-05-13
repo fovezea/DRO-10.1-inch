@@ -9,11 +9,13 @@
 #include "esp_err.h"
 #include "esp_check.h"
 #include "esp_memory_utils.h"
+#ifdef CONFIG_ESP_WIFI_REMOTE_ENABLED
 #include "esp_wifi.h"
 #include "esp_event.h"
 #include "esp_netif.h"
 #include "esp_hosted.h"
 #include "esp_hosted_api_types.h"
+#endif
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
@@ -42,12 +44,13 @@ extern void init_frontend_host(void);
 // #define LCD_V_RES              800
 
 // Forward declarations for callbacks
+#ifdef CONFIG_ESP_WIFI_REMOTE_ENABLED
 static void wifi_scan_callback(void);
 static void network_selected_callback(const char *ssid);
-
-// Forward declaration for WiFi initialization  
 static esp_err_t wifi_init(void);
 static void wifi_init_task(void *pvParameters);
+static void wifi_scan_task(void *pvParameters);
+#endif
 
 // Forward declaration for UI tick task
 static void ui_tick_task(void *pvParameters);
@@ -57,6 +60,7 @@ static void dro_update_task(void *pvParameters);
 
 static const char *TAG = "WIFI_DEBUG";
 
+#ifdef CONFIG_ESP_WIFI_REMOTE_ENABLED
 /* WiFi scan result storage */
 #define MAX_AP_COUNT 20
 static wifi_ap_record_t ap_info[MAX_AP_COUNT];
@@ -66,16 +70,18 @@ static uint16_t ap_count = 0;
 static EventGroupHandle_t wifi_event_group;
 #define WIFI_CONNECTED_BIT BIT0
 #define WIFI_FAIL_BIT      BIT1
+#endif
 
 /* Display handles */
 static lv_display_t *lvgl_disp = NULL;
 
 
+#ifdef CONFIG_ESP_WIFI_REMOTE_ENABLED
 /**
  * @brief WiFi event handler with detailed logging
  */
 static void wifi_event_handler(void* arg, esp_event_base_t event_base,
-                              int32_t event_id, void* event_data)
+                               int32_t event_id, void* event_data)
 {
     if (event_base == WIFI_EVENT) {
         switch (event_id) {
@@ -104,8 +110,6 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
         }
     }
 }
-
-
 
 /**
  * @brief Initialize WiFi with detailed logging and slave device validation
@@ -257,7 +261,6 @@ static void wifi_scan_task(void *pvParameters)
     }
     
     // Get scan results
-    // Get scan results
     ESP_ERROR_CHECK(esp_wifi_scan_get_ap_num(&ap_count));
     
     if (ap_count == 0) {
@@ -282,6 +285,54 @@ static void wifi_scan_task(void *pvParameters)
     
     vTaskDelete(NULL);
 }
+
+/**
+ * @brief Delayed WiFi initialization task with slave device health checks
+ */
+static void wifi_init_task(void *pvParameters)
+{
+    // Wait for other components to fully initialize (5 seconds delay)
+    vTaskDelay(pdMS_TO_TICKS(5000));
+    
+    ESP_LOGI(TAG, "Starting delayed WiFi initialization...");
+
+    /* Initialize WiFi */
+    esp_err_t ret = wifi_init();
+    
+    if (ret == ESP_OK) {
+        ESP_LOGI(TAG, "WiFi initialized successfully, starting scan task...");
+        // Wait a bit more before starting scan
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        
+        // Create WiFi scan task only if WiFi init succeeded
+        xTaskCreate(wifi_scan_task, "wifi_scan", 4096, NULL, 2, NULL);
+    } else {
+        ESP_LOGW(TAG, "WiFi initialization failed - ESP32-C6 slave may not be connected");
+        ESP_LOGW(TAG, "System will continue to operate without WiFi functionality");
+    }
+    
+    ESP_LOGI(TAG, "WiFi initialization task complete");
+    vTaskDelete(NULL);
+}
+
+/**
+ * @brief WiFi scan callback for EEZ UI
+ */
+static void wifi_scan_callback(void)
+{
+    eez_ui_set_status("Scanning...");
+    esp_wifi_scan_start(NULL, false);
+}
+
+/**
+ * @brief Network selection callback for EEZ UI
+ */
+static void network_selected_callback(const char *ssid)
+{
+    // TODO: Implement network connection logic
+    eez_ui_set_status("Selected network - connection not implemented yet");
+}
+#endif
 
 /**
  * @brief Task to create UI elements after LVGL is ready
@@ -350,8 +401,6 @@ static void system_monitor_task(void *pvParameters)
         ESP_LOGI(TAG, "Min free heap: %lu bytes", esp_get_minimum_free_heap_size());
         ESP_LOGI(TAG, "Free internal heap: %lu bytes", esp_get_free_internal_heap_size());
         ESP_LOGI(TAG, "Task count: %d", uxTaskGetNumberOfTasks());
-        
-        // Display rotation is handled by BSP - no need to check or correct
         
         vTaskDelay(pdMS_TO_TICKS(10000)); // Print every 10 seconds
     }
@@ -425,11 +474,6 @@ void app_main(void)
 
     /* Initialize Axis Mapping */
     axis_mapping_init();
-
-    /* Initialize FPGA Comms */
-    // if (fpga_comms_init() != ESP_OK) {
-    //     ESP_LOGE(TAG, "Failed to initialize FPGA Comms");
-    // }
     
     /* Initialize DRO System */
     if (dro_init() == ESP_OK) {
@@ -449,14 +493,10 @@ void app_main(void)
     // Create UI tick task for EEZ Studio (slightly higher priority)
     xTaskCreate(ui_tick_task, "ui_tick", 4096, NULL, 5, NULL);
     
-    // Create system monitor task
-    // xTaskCreate(system_monitor_task, "system_monitor", 4096, NULL, 1, NULL);
-    
+#ifdef CONFIG_ESP_WIFI_REMOTE_ENABLED
     // Create delayed WiFi initialization task with slave device health checks
     xTaskCreate(wifi_init_task, "wifi_init", 4096, NULL, 2, NULL);
-
-
-
+#endif
 
     // Create DRO Update Task
     xTaskCreate(dro_update_task, "dro_update", 4096, NULL, 5, NULL);
@@ -484,16 +524,6 @@ static void dro_update_task(void *pvParameters)
             set_var_virtual_axis_3(state->axes[DRO_AXIS_Z].displayed_value);
             set_var_virtual_axis_4(state->axes[DRO_AXIS_W].displayed_value);
             set_var_virtual_axis_5(state->axes[DRO_AXIS_C].displayed_value);
-        
-            // Update Unit Labels - REMOVED (Handled in screens.c tick_screen_main)
-            // const char* unit_str = (state->current_unit == DRO_UNIT_MM) ? "mm" : "in";
-            // if (objects.mm_x_axis1_label) lv_label_set_text(objects.mm_x_axis1_label, unit_str);
-            // if (objects.mm_x_axis2_label) lv_label_set_text(objects.mm_x_axis2_label, unit_str);
-            // if (objects.mm_x_axis3_label) lv_label_set_text(objects.mm_x_axis3_label, unit_str);
-            // if (objects.mm_x_axis4_label) lv_label_set_text(objects.mm_x_axis4_label, unit_str);
-            // if (objects.mm_x_axis5_label) lv_label_set_text(objects.mm_x_axis5_label, unit_str);
-            
-            // Optional: Update ABS/INC button label if it existed as a label, but it's a toggle button usually
             
             // Update Active Tool and Space Displays via variable setters (EEZ UI handles the sync)
             set_var_active_tool_number(state->active_tool_index);
@@ -504,51 +534,4 @@ static void dro_update_task(void *pvParameters)
 
         vTaskDelay(pdMS_TO_TICKS(20)); // 50Hz update rate
     }
-}
-
-/**
- * @brief Delayed WiFi initialization task with slave device health checks
- */
-static void wifi_init_task(void *pvParameters)
-{
-    // Wait for other components to fully initialize (5 seconds delay)
-    vTaskDelay(pdMS_TO_TICKS(5000));
-    
-    ESP_LOGI(TAG, "Starting delayed WiFi initialization...");
-
-    /* Initialize WiFi */
-    esp_err_t ret = wifi_init();
-    
-    if (ret == ESP_OK) {
-        ESP_LOGI(TAG, "WiFi initialized successfully, starting scan task...");
-        // Wait a bit more before starting scan
-        vTaskDelay(pdMS_TO_TICKS(1000));
-        
-        // Create WiFi scan task only if WiFi init succeeded
-        xTaskCreate(wifi_scan_task, "wifi_scan", 4096, NULL, 2, NULL);
-    } else {
-        ESP_LOGW(TAG, "WiFi initialization failed - ESP32-C6 slave may not be connected");
-        ESP_LOGW(TAG, "System will continue to operate without WiFi functionality");
-    }
-    
-    ESP_LOGI(TAG, "WiFi initialization task complete");
-    vTaskDelete(NULL);
-}
-
-/**
- * @brief WiFi scan callback for EEZ UI
- */
-static void wifi_scan_callback(void)
-{
-    eez_ui_set_status("Scanning...");
-    esp_wifi_scan_start(NULL, false);
-}
-
-/**
- * @brief Network selection callback for EEZ UI
- */
-static void network_selected_callback(const char *ssid)
-{
-    // TODO: Implement network connection logic
-    eez_ui_set_status("Selected network - connection not implemented yet");
 }

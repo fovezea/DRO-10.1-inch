@@ -80,7 +80,7 @@
          ESP_GOTO_ON_ERROR(gpio_config(&io_conf), err, TAG, "configure GPIO for RST line failed");
      }
  
-     switch (panel_dev_config->color_space) {
+     switch (panel_dev_config->rgb_ele_order) {
      case LCD_RGB_ELEMENT_ORDER_RGB:
          jd9365->madctl_val = 0;
          break;
