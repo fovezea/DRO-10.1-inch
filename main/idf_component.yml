@@ -4,7 +4,11 @@ dependencies:
     version: "9.2.*"
     public: true
   espressif/esp_hosted:
-    version: ">=2.1.2"
+    version: "3.1.0"
   espressif/esp_wifi_remote:
     version: ">=0.1.0"
+  # 1.3.2 still includes the pre-IDF-6 driver/* headers; 1.6.x switches to
+  # esp_driver_gpio/i2c/i2s/spi when it detects IDF >= 6.
+  espressif/esp_codec_dev:
+    version: "1.6.2"
   idf: ">=5.3"

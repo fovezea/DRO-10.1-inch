@@ -71,10 +71,10 @@ esp_err_t bsp_extra_i2s_read(void *audio_buffer, size_t len, size_t *bytes_read,
     return ret;
 }
 
-esp_err_t bsp_extra_i2s_write(void *audio_buffer, size_t len, size_t *bytes_written, uint32_t timeout_ms)
+esp_err_t bsp_extra_i2s_write(const void *audio_buffer, size_t len, size_t *bytes_written, uint32_t timeout_ms)
 {
     esp_err_t ret = ESP_OK;
-    ret = esp_codec_dev_write(play_dev_handle, audio_buffer, len);
+    ret = esp_codec_dev_write(play_dev_handle, (void *)audio_buffer, len);
     *bytes_written = len;
     return ret;
 }

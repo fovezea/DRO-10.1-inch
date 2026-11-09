@@ -6,7 +6,7 @@ dependencies:
     path: ../esp32_p4_function_ev_board
 
   chmorgan/esp-audio-player:
-    version: "1.0.*"
+    version: "2.0.1"
     public: true
 
   chmorgan/esp-file-iterator:
