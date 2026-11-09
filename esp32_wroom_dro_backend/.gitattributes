@@ -1,0 +1,2 @@
+# Keep the sources LF everywhere; they are built on Windows and Linux alike.
+* text=auto eol=lf

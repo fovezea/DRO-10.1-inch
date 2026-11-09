@@ -1,0 +1,21 @@
+# Defaults for the ESP32-WROOM-32E DRO backend.
+# Applied when the sdkconfig is first generated:
+#   idf.py set-target esp32
+
+CONFIG_IDF_TARGET="esp32"
+
+# 4 MB flash on the WROOM-32E module; single 1.5 MB application partition.
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE=y
+
+# 240 MHz and a 1 kHz tick: the axis sampler runs once per millisecond.
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
+CONFIG_FREERTOS_HZ=1000
+
+# The PCNT overflow callback runs from an ISR, including while NVS writes keep
+# the flash cache busy.
+CONFIG_PCNT_ISR_IRAM_SAFE=y
+
+# Console and log output on UART0 (the CH340C USB serial port).
+CONFIG_ESP_CONSOLE_UART_DEFAULT=y
+CONFIG_LOG_DEFAULT_LEVEL_INFO=y

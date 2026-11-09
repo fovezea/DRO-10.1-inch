@@ -1,0 +1,99 @@
+menu "DRO backend"
+
+    config DRO_DEVICE_NAME
+        string "Device name announced to the frontend"
+        default "wroom-dro"
+
+    choice DRO_LINK_UART_PORT
+        prompt "UART used for the wired frontend link"
+        default DRO_LINK_UART_PORT_2
+        help
+            The ESP32-WROOM has three UARTs.  UART0 is wired to the CH340C USB
+            bridge and the J2 programming header; UART1's default pins are the
+            SPI flash pins and cannot be used.
+
+            UART2's default pins (GPIO16/17) are consumed by the V-axis
+            encoder on this board, but UART2 can be routed through the GPIO
+            matrix to the free pins on the J3 spare header (GPIO21/22/23), so
+            that is the recommended option: it keeps UART0 free for the
+            console and for flashing.
+
+        config DRO_LINK_UART_PORT_0
+            bool "UART0 - J2 / CH340 USB port (console disabled)"
+
+        config DRO_LINK_UART_PORT_2
+            bool "UART2 - J3 spare header GPIO21/GPIO22 (recommended)"
+    endchoice
+
+    config DRO_LINK_UART_TX_GPIO
+        int "UART TX GPIO (J3 pin 4)"
+        depends on DRO_LINK_UART_PORT_2
+        default 21
+
+    config DRO_LINK_UART_RX_GPIO
+        int "UART RX GPIO (J3 pin 5)"
+        depends on DRO_LINK_UART_PORT_2
+        default 22
+
+    config DRO_LINK_UART_BAUD
+        int "Default link baud rate"
+        default 460800
+        help
+            460800 is a good default.  At 50 Hz the telemetry frame is about
+            46 bytes, i.e. ~2.3 kB/s, so even 115200 would be enough; the
+            higher rate keeps command latency down.
+
+    config DRO_SESSION_TIMEOUT_MS
+        int "Frontend session timeout (ms)"
+        default 3000
+        help
+            The backend streams only while the frontend keeps talking (any
+            valid frame refreshes the session).  This is what stops a dead
+            frontend from being spammed forever.
+
+    config DRO_DEFAULT_STREAM_HZ
+        int "Default telemetry rate (Hz)"
+        range 1 200
+        default 50
+
+    config DRO_CONSOLE_ENABLE
+        bool "Enable the serial console REPL on UART0"
+        default y
+        depends on DRO_LINK_UART_PORT_2
+        help
+            The console shares UART0 with the CH340C USB port.  It is disabled
+            automatically when the binary link itself uses UART0.
+
+    config DRO_ESPNOW_ENABLE
+        bool "Enable the ESP-NOW transport"
+        default y
+        help
+            ESP-NOW needs a Wi-Fi radio on the frontend as well.  The ESP32-P4
+            has none: its ESP32-C6 is an ESP-Hosted slave and does not expose
+            the ESP-NOW API.  Sending works regardless; a frontend can only
+            receive it once it has a local radio (or a C6 bridge).
+
+    config DRO_ESPNOW_CHANNEL
+        int "Default Wi-Fi channel"
+        range 1 13
+        default 6
+        help
+            Both ESP-NOW peers must be on the same channel.  Change it at
+            runtime with:  link channel <n>
+
+    config DRO_ESPNOW_LR
+        bool "ESP-NOW long-range mode"
+        default n
+        help
+            Long-range uses a lower data rate for better sensitivity.  Both
+            ends must enable it.
+
+    config DRO_STATUS_LED_GPIO
+        int "Status LED GPIO (-1 disables)"
+        default 19
+
+    config DRO_STATUS_LED_ACTIVE_HIGH
+        bool "Status LED is active high (anode to GPIO)"
+        default y
+
+endmenu

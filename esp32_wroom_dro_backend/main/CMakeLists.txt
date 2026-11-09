@@ -1,0 +1,23 @@
+idf_component_register(
+    SRCS
+        "app_main.c"
+        "axis_reader.c"
+        "config_store.c"
+        "link.c"
+        "transport_uart.c"
+        "transport_espnow.c"
+        "console_cmds.c"
+        "status_led.c"
+    INCLUDE_DIRS "."
+    REQUIRES
+        dro_link
+        esp_driver_pcnt
+        esp_driver_gpio
+        esp_driver_uart
+        esp_wifi
+        esp_netif
+        esp_event
+        nvs_flash
+        esp_timer
+        console
+)
