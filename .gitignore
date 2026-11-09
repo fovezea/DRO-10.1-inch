@@ -33,3 +33,11 @@ esp32p4_usb_dro_backend/sdkconfig.old
 esp32p4_usb_dro_backend/sdkconfig
 esp32p4_usb_dro_backend/.vscode/
 esp32p4_usb_dro_backend/documentation/
+
+# ESP32-C6 hosted coprocessor: sdkconfig is generated from its sdkconfig.defaults
+esp32c6_hosted_cp/sdkconfig
+esp32c6_hosted_cp/sdkconfig.old
+
+# Build logs
+*.log
+

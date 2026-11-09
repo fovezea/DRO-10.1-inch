@@ -17,6 +17,31 @@ compatibility define; no application logic changed.
 
 Remove the LVGL alias when LVGL is bumped to 9.3.
 
+## Verification status — compile-only
+
+**Neither firmware has been flashed or run.** This migration is verified to the
+point where the compiler and linker are satisfied, nothing more.
+
+| Target | Verified |
+|---|---|
+| ESP32-P4 application | builds, `lvgl_demo_v9.bin` = 1,563,728 bytes |
+| ESP32-C6 coprocessor (`esp32c6_hosted_cp/`) | builds, `eh_cp_wifi_sta.bin` = 0x118d60 bytes |
+
+What that does **not** prove:
+
+* esp_hosted 3.1.0 brings the SDIO link up and Wi-Fi works at runtime. The
+  hosted protocol changed between 2.x and 3.x, so this is the highest-risk
+  change in the migration.
+* The LVGL `RGB565_SWAPPED` alias produces correct colours on the real panel —
+  it compiles, but byte order has not been observed.
+* The audio-player 2.0.1 callback works at runtime (the change is
+  compile-only).
+* Any DRO UI behaviour, touch, display or audio.
+
+Suggested runtime order once hardware is available: flash C6 → flash P4 →
+check the hosted version/transport log at boot → Wi-Fi scan → display and
+touch → audio.
+
 ## Windows long paths
 
 esp_hosted 3.1.0's archive contains an example file whose full path under the

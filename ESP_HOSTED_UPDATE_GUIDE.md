@@ -1,61 +1,42 @@
-# ESP-Hosted Firmware Update Guide (ESP32-C6)
+# ESP-Hosted coprocessor firmware (ESP32-C6)
 
-This guide details the process for updating and flashing the ESP-Hosted firmware onto the ESP32-C6 co-processor. This is required if you want to update the WiFi/Bluetooth capabilities provided to the main ESP32-P4 host.
+> **Updated for esp_hosted 3.1.0 on ESP-IDF 6.1.**
+> The previous version of this guide said `cd components/espressif__esp_hosted/slave`.
+> That project no longer exists: esp_hosted 3.x replaced `slave/` with a `cp/`
+> project per example, and the component now lives in `managed_components/`,
+> which is wiped on every dependency resolve.
 
-## 📋 Prerequisites
+The C6 firmware is vendored in this repository at **`esp32c6_hosted_cp/`**,
+copied from esp_hosted 3.1.0 `examples/wifi/sta/cp` and pinned to 3.1.0. See
+[`esp32c6_hosted_cp/README.md`](esp32c6_hosted_cp/README.md) for details.
 
-*   **ESP-IDF v5.x** installed and active in your terminal.
-*   **USB Connection**: Connect the ESP32-C6 **directly** to your PC via its USB port.
-    *   *Note: Do not confuse this with the ESP32-P4's USB port.*
-*   Identify the **COM Port** of the ESP32-C6 (e.g., `COM3`, `/dev/ttyUSB1`).
+## Build and flash
 
-## 🚀 Step-by-Step Procedure
-
-### 1. Navigate to the Slave Component
-The firmware source code is located within the project's components directory.
-
-```bash
-cd components/espressif__esp_hosted/slave
-```
-
-### 2. Set the Target
-Tell ESP-IDF that we are building for the ESP32-C6.
-
-```bash
+```powershell
+. C:\Espressif\tools\Microsoft.v6.1.PowerShell_profile.ps1
+cd esp32c6_hosted_cp
 idf.py set-target esp32c6
-```
-
-### 3. Configuration (Optional)
-Verify or modify the configuration (e.g., verify SDIO vs SPI transport settings). The default in this project is **SDIO**.
-
-```bash
-idf.py menuconfig
-```
-*   Check `Example Configuration > Transport layer`.
-
-### 4. Build the Firmware
-Compile the project.
-
-```bash
 idf.py build
+idf.py -p COMx flash          # COMx = the C6's own USB port, not the P4's
 ```
 
-### 5. Flash and Monitor
-Flash the compiled binary to the ESP32-C6. Replace `COMx` with your actual port.
+Output: `build/eh_cp_wifi_sta.bin` (~1.15 MB).
 
-```bash
-idf.py -p COMx flash monitor
-```
+## Rules
 
----
+* **Version coupling.** The C6 firmware and the P4 application must use the
+  same esp_hosted version. This project pins 3.1.0 in both places
+  (`main/idf_component.yml` and `esp32c6_hosted_cp/main/idf_component.yml`).
+  Rebuild the C6 whenever esp_hosted changes.
+* **Transport coupling.** The C6 runs SDIO (`CONFIG_EH_TRANSPORT_CP_SDIO=y`,
+  high speed). The P4 must use the matching `CONFIG_ESP_HOSTED_SDIO_*`
+  settings (slot 1, 4-bit, reset GPIO 54).
+* **Do not edit the copy under `managed_components/`** — it is regenerated.
+  Change `esp32c6_hosted_cp/` instead, and update the vendored copy when
+  esp_hosted is bumped.
 
-## ❓ Frequently Asked Questions
+## Status
 
-**Q: Do I need to do this every time I update the main P4 application?**
-A: **No.** You only need to update the C6 firmware if the `espressif__esp_hosted` component version changes or if you need to change the transport configuration (e.g., switching from SDIO to SPI).
-
-**Q: My P4 cannot connect to the C6?**
-A: Ensure:
-1.  The C6 is flashed with the correct transport mode (SDIO).
-2.  The strapping pins on the C6 are set correctly (if applicable).
-3.  The P4 application matches the transport configuration.
+Compile-verified with ESP-IDF 6.1 (`eh_cp_wifi_sta.bin`, 0x118d60 bytes).
+Not flashed and not runtime-tested. In particular, the SDIO link between the
+P4 and this C6 image has not been exercised since the 3.1.0 migration.
