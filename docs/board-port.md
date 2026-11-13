@@ -1,7 +1,9 @@
 # Board port: adding the osptek ESP32-P4C5 (JD9366) board to DRO
 
-Status: S1–S4 implemented; S3 verified on **both boards on hardware**. S5 and the rest of
-the S6 matrix (audio, TF card, Wi-Fi) outstanding. Branch `feature/board-port`, cut from
+Status: S1–S5 done. S3 verified on **both boards on hardware**; S2/S4/S5 verified by build
+(and, for S5, by the host log in the HMI project, where the same image reports
+`coprocessor=3.1.0 (match)`). The rest of the S6 matrix (audio, TF card, Wi-Fi on DRO) is
+outstanding. Branch `feature/board-port`, cut from
 `feature/idf6.1` because no local `dev` existed at the time; rebase onto `dev` once it has
 been fetched and merged (see §8).
 
@@ -118,10 +120,13 @@ configure; `ESP_REV_MAX_FULL` is 199 / 399 respectively; each produces a distinc
 its revision family (bootloader 0x5e30 / 0x5690). The rev ≥ 3.0 bootloader only fits the
 0x2000..0x8000 slot with `BOOTLOADER_LOG_LEVEL_WARN`.
 
-**S5 — co-processor firmware.** Copy `firmware/ESP32-C5_ESP-Hosted_v3.1.0_merged_0x0.bin` from
-HMI into DRO and document the flashing procedure (switch, BOOT+RST, `--before no-reset`, offset
-`0x0`). No CP source duplication — if the image ever needs rebuilding, it happens in HMI.
-*Acceptance:* link reports `coprocessor=3.1.0 (match)` on the osptek board.
+**S5 — co-processor firmware.** **(done)** `firmware/ESP32-C5_ESP-Hosted_v3.1.0_merged_0x0.bin`
+copied from HMI, with `firmware/README.md` documenting the procedure (switch to C5, manual
+BOOT+RST, `--before no-reset`, offset `0x0`) and where it is built. No CP source duplication —
+rebuilding happens in HMI. The Guition board needs nothing here: its C6 image comes from this
+repo's own `esp32c6_hosted_cp/`.
+*Acceptance:* link reports `coprocessor=3.1.0 (match)` on the osptek board — evidenced in the
+HMI project with this identical image.
 
 **S6 — verification matrix** (§6) on both boards.
 
