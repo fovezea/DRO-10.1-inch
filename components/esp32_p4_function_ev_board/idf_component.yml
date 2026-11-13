@@ -5,6 +5,8 @@ dependencies:
   esp_lcd_touch_gt911: ^1
   esp_lcd_jd9365: 
     path: ../esp_lcd_jd9365
+  esp_lcd_jd9366:
+    path: ../esp_lcd_jd9366
   esp_lcd_touch_gsl3680:
     path: ../esp_lcd_touch_gsl3680
   espressif/esp_lvgl_port:

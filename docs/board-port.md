@@ -1,8 +1,8 @@
 # Board port: adding the osptek ESP32-P4C5 (JD9366) board to DRO
 
-Status: plan, nothing implemented. Branch `feature/board-port`, cut from `feature/idf6.1`
-because no local `dev` existed at the time; rebase onto `dev` once it has been fetched and
-merged (see §8).
+Status: S1–S4 implemented, S5–S6 outstanding. Branch `feature/board-port`, cut from
+`feature/idf6.1` because no local `dev` existed at the time; rebase onto `dev` once it has
+been fetched and merged (see §8).
 
 Goal: one DRO application, two boards, selected at build time — the Guition board it runs on
 today, and the osptek ESP32-P4C5 board from the HMI project. Repos stay separate; only the
@@ -28,9 +28,11 @@ What the port preserves:
    osptek board and disabled on the Guition board for a reason.
 2. Touch flags travel with the angle. Changing one without the other inverts touch input,
    and LVGL maps touch through the display rotation.
-3. The angle is currently hardcoded in `main.c` (twice in DRO). When the BSP gains a board
-   choice, move it next to the board definition so a new board cannot inherit the wrong
-   angle. Cheap, and the only real trap in this area.
+3. The angle used to be hardcoded in `main.c` (twice in DRO). It now lives next to the board
+   definition as `BSP_LCD_ROTATION` in
+   `components/esp32_p4_function_ev_board/include/bsp/esp32_p4_function_ev_board.h`, beside
+   the per-board touch flags, and `bsp_display_start()` applies it. `main.c` no longer
+   touches rotation at all.
 
 Acceptance for any board: UI upright **and** a dragged slider that tracks the finger.
 
@@ -71,7 +73,7 @@ hard to get right.
 | Axis | Where | Values |
 |---|---|---|
 | Board / panel / touch / rotation | Kconfig, this component | `BSP_BOARD_EV_JD9365` (default), `BSP_BOARD_OSPTEK_JD9366` |
-| SoC-level profile | `sdkconfig.board.<profile>` overlays + `CMakeLists.txt` | `guition` (P4 rev < 3.0, `SLAVE_IDF_TARGET_ESP32C6`), `osptek` (rev ≥ 3.0, `..._ESP32C5`) |
+| SoC-level profile | `sdkconfig` / `sdkconfig.osptek` + `CMakeLists.txt` | `guition` (P4 rev < 3.0, `SLAVE_IDF_TARGET_ESP32C6`), `osptek` (rev ≥ 3.0, `..._ESP32C5`) |
 
 They must be separate because the P4 revision families are mutually exclusive in IDF and DRO's
 `sdkconfig` is committed — a Kconfig-only switch cannot change `ESP32P4_SELECTS_REV_LESS_V3`
@@ -81,21 +83,39 @@ without editing a tracked file.
 
 **S1 — branch and this document.** `feature/board-port`; rebase onto `dev` after the merge.
 
-**S2 — drivers.** Copy `components/esp_lcd_jd9366/` from HMI into DRO (5 files: panel + in-cell
-touch driver). DRO keeps `esp_lcd_jd9365`. *Acceptance:* builds green with the component present
-but unreferenced.
+**S2 — drivers.** **(done)** Copy `components/esp_lcd_jd9366/` from HMI into DRO (5 files:
+panel + in-cell touch driver). DRO keeps `esp_lcd_jd9365`. *Acceptance:* builds green with the
+component present but unreferenced.
 
-**S3 — BSP board choice.** Add `choice BSP_BOARD` to `components/esp32_p4_function_ev_board/Kconfig`;
-move the current JD9365 path under `BSP_BOARD_EV_JD9365` unchanged; add `BSP_BOARD_OSPTEK_JD9366`
-that instantiates `esp_lcd_jd9366` with the vendor DPI macros (80 MHz, 8/28/40 + 8/20/140 =
-63.07 Hz), `BSP_LCD_RST`/`BSP_LCD_BL` = NC, PA = 53, JD9366 in-cell touch on the existing I²C
-bus, and the rotation contract from §1. *Acceptance:* Guition build unchanged and still upright;
-osptek build upright with correct touch.
+**S3 — BSP board choice.** **(done)** `choice BSP_BOARD` in
+`components/esp32_p4_function_ev_board/Kconfig`, with `BSP_BOARD_EV_JD9365` (default) holding
+the previous JD9365 path unchanged. `BSP_BOARD_OSPTEK_JD9366` adds:
 
-**S4 — sdkconfig profiles.** `sdkconfig.board.guition` / `sdkconfig.board.osptek` plus the
-`CMakeLists.txt` selection (same mechanism as `HMI-10.1-esp32-p4c6`). *Acceptance:* both
-profiles configure; `ESP_REV_MAX_FULL` is 199 / 399 respectively; the C5 profile builds an image
-that boots on v3.2.
+- the JD9366 panel instantiated with the vendor DPI macros from `esp_lcd_jd9366.h`
+  (80 MHz, 8/28/40 + 8/20/140 = 63.07 Hz) and the vendor DSI bus config (1000 Mbps/lane,
+  PLLREF clock source — the pre-v3.0 `MIPI_DSI_PHY_CLK_SRC_DEFAULT` aborts on rev ≥ 3.0);
+- the JD9366 in-cell touch driver on the existing BSP I²C bus (port 1, SDA 7 / SCL 8,
+  400 kHz), with reset/interrupt = NC (BackDoor soft reset, polling) and zero touch flags;
+- the board pin map: `BSP_LCD_RST`, `BSP_LCD_BACKLIGHT`, touch reset and interrupt = NC;
+  power amplifier = GPIO53. The brightness calls become no-ops on this board (the backlight
+  boost is hardwired), so `bsp_display_backlight_on()` stays safe to call from the app;
+- the §1 rotation contract in one place: `BSP_LCD_ROTATION` = 270° / 90° next to the touch
+  mirror/swap flags, applied by `bsp_display_start()`. `CONFIG_LVGL_PORT_ENABLE_PPA=y` in
+  `sdkconfig.osptek` keeps the osptek board on the PPA engine (CPU rotation stays on the
+  Guition).
+
+*Acceptance:* Guition build unchanged in behaviour (same panel, pins, flags and rotation) and
+the osptek profile builds. **The on-hardware half (upright UI, slider tracking) is S6** and
+still needs both boards.
+
+**S4 — sdkconfig profiles.** **(done)** `sdkconfig` (guition: rev < 3.0, ESP32-C6, JD9365) and
+`sdkconfig.osptek` (rev ≥ 3.0, ESP32-C5, JD9366), selected by `-DDRO_BOARD=guition|osptek` (or
+the `DRO_BOARD` environment variable) in the block at the top of `CMakeLists.txt`, which also
+exports `DRO_BOARD_GUITION` / `DRO_BOARD_OSPTEK`. The original plan named the files
+`sdkconfig.board.*`; the implemented names are the two above. *Acceptance:* both profiles
+configure; `ESP_REV_MAX_FULL` is 199 / 399 respectively; each produces a distinct image for
+its revision family (bootloader 0x5e30 / 0x5690). The rev ≥ 3.0 bootloader only fits the
+0x2000..0x8000 slot with `BOOTLOADER_LOG_LEVEL_WARN`.
 
 **S5 — co-processor firmware.** Copy `firmware/ESP32-C5_ESP-Hosted_v3.1.0_merged_0x0.bin` from
 HMI into DRO and document the flashing procedure (switch, BOOT+RST, `--before no-reset`, offset
@@ -113,7 +133,7 @@ HMI into DRO and document the flashing procedure (switch, BOOT+RST, `--before no
 | Wrong image family flashed → board refuses to boot | Profiles; check `Chip rev:` in the boot log; documented in S4 |
 | rev ≥ 3.0 bootloader is ~1.4 KB larger and may not fit DRO's partition layout | Check `bootloader.bin` size against the partition table; fall back to `CONFIG_BOOTLOADER_LOG_LEVEL_WARN` like HMI did |
 | LVGL 9.2 (DRO) vs 9.5 (HMI) API drift in the copied drivers | Copy only the driver sources (they use panel/dsi APIs, not LVGL); if `lv_display_set_rotation` semantics differ, S3 catches it |
-| DRO's `main.c` calls rotation twice, in two paths | Remove both in S3; the BSP owns it |
+| DRO's `main.c` calls rotation twice, in two paths | Retired in S3: both calls removed; the BSP owns the angle and applies it in `bsp_display_start()` |
 
 ## 6. Test matrix
 
@@ -136,7 +156,11 @@ Outstanding:
    GSL3680; confirm on hardware before touching that path.
 2. **Does the JD9365 path still boot and rotate correctly today?** It is the baseline, so run the
    test matrix on it *before* adding the second board, to be able to tell a regression from a
-   pre-existing fault.
+   pre-existing fault. Still open: S3 only proves the Guition build, not its rotation on glass.
+3. **TF card on the osptek board** -- the plan's pin table puts card detect on GPIO45, but
+   `bsp_sdcard_mount()` still mounts slot 0 (IOMUX, 39-44) with `NO_CD`, exactly as on the
+   Guition. A card should mount; insertion/removal will not be detected. Wire `.cd` only after
+   confirming 45 is actually the detect switch on the carrier.
 
 ## 8. Git
 

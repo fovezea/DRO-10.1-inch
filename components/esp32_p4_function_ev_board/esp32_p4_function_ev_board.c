@@ -22,6 +22,8 @@
 
 #include "esp_lcd_jd9365.h"
 #include "esp_lcd_touch_gsl3680.h"
+#include "esp_lcd_jd9366.h"
+#include "esp_lcd_touch_jd9366.h"
 
 #include "bsp/esp32_p4_function_ev_board.h"
 #include "bsp/display.h"
@@ -333,6 +335,13 @@ esp_codec_dev_handle_t bsp_audio_codec_microphone_init(void)
 
 esp_err_t bsp_display_brightness_init(void)
 {
+#if CONFIG_BSP_BOARD_OSPTEK_JD9366
+    /* No SoC pin in the backlight path on this board: the boost converter is
+     * always on, so there is no LEDC channel to configure (and GPIO_NUM_NC
+     * cannot be configured anyway). */
+    ESP_LOGD(TAG, "Backlight is hardwired on this board, brightness is fixed");
+    return ESP_OK;
+#else
     // Setup LEDC peripheral for PWM backlight control
     const ledc_channel_config_t LCD_backlight_channel = {
         .gpio_num = BSP_LCD_BACKLIGHT,
@@ -354,10 +363,15 @@ esp_err_t bsp_display_brightness_init(void)
     BSP_ERROR_CHECK_RETURN_ERR(ledc_timer_config(&LCD_backlight_timer));
     BSP_ERROR_CHECK_RETURN_ERR(ledc_channel_config(&LCD_backlight_channel));
     return ESP_OK;
+#endif
 }
 
 esp_err_t bsp_display_brightness_set(int brightness_percent)
 {
+#if CONFIG_BSP_BOARD_OSPTEK_JD9366
+    ESP_LOGD(TAG, "Ignoring backlight %d%%: backlight is hardwired", brightness_percent);
+    return ESP_OK;
+#else
     if (brightness_percent > 100) {
         brightness_percent = 100;
     }
@@ -370,6 +384,7 @@ esp_err_t bsp_display_brightness_set(int brightness_percent)
     BSP_ERROR_CHECK_RETURN_ERR(ledc_set_duty(LEDC_LOW_SPEED_MODE, LCD_LEDC_CH, duty_cycle));
     BSP_ERROR_CHECK_RETURN_ERR(ledc_update_duty(LEDC_LOW_SPEED_MODE, LCD_LEDC_CH));
     return ESP_OK;
+#endif
 }
 
 esp_err_t bsp_display_backlight_off(void)
@@ -419,25 +434,60 @@ esp_err_t bsp_display_new_with_handles(const bsp_display_config_t *config, bsp_l
 
     /* create MIPI DSI bus first, it will initialize the DSI PHY as well */
     esp_lcd_dsi_bus_handle_t mipi_dsi_bus;
+#if CONFIG_BSP_BOARD_OSPTEK_JD9366
+    /* Vendor bus config, not a tuning choice: 1000 Mbps/lane and the PLLREF
+     * clock source. The legacy MIPI_DSI_PHY_CLK_SRC_DEFAULT expands to PLL_F20M,
+     * which is pre-v3.0 only and aborts on this board's rev >= 3.0 silicon. */
+    esp_lcd_dsi_bus_config_t bus_config = JD9366_PANEL_BUS_DSI_2CH_CONFIG();
+#else
     esp_lcd_dsi_bus_config_t bus_config = {
         .bus_id = 0,
         .num_data_lanes = BSP_LCD_MIPI_DSI_LANE_NUM,
         .phy_clk_src = MIPI_DSI_PHY_CLK_SRC_DEFAULT,
         .lane_bit_rate_mbps = 1500,
     };
+#endif
     ESP_RETURN_ON_ERROR(esp_lcd_new_dsi_bus(&bus_config, &mipi_dsi_bus), TAG, "New DSI bus init failed");
 
     ESP_LOGI(TAG, "Install MIPI DSI LCD control panel");
     // we use DBI interface to send LCD commands and parameters
     esp_lcd_panel_io_handle_t io;
+#if CONFIG_BSP_BOARD_OSPTEK_JD9366
+    esp_lcd_dbi_io_config_t dbi_config = JD9366_PANEL_IO_DBI_CONFIG();
+#else
     esp_lcd_dbi_io_config_t dbi_config = {
         .virtual_channel = 0,
         .lcd_cmd_bits = 8,   // according to the LCD JD9365 spec
         .lcd_param_bits = 8, // according to the LCD JD9365 spec
     };
+#endif
     ESP_GOTO_ON_ERROR(esp_lcd_new_panel_io_dbi(mipi_dsi_bus, &dbi_config, &io), err, TAG, "New panel IO failed");
 
     esp_lcd_panel_handle_t disp_panel = NULL;
+
+#if CONFIG_BSP_BOARD_OSPTEK_JD9366
+    ESP_LOGI(TAG, "Install JD9366 LCD control panel");
+#if CONFIG_BSP_LCD_COLOR_FORMAT_RGB888
+    esp_lcd_dpi_panel_config_t dpi_config = JD9366_800_1280_PANEL_60HZ_DPI_CONFIG(LCD_COLOR_FMT_RGB888);
+#else
+    esp_lcd_dpi_panel_config_t dpi_config = JD9366_800_1280_PANEL_60HZ_DPI_CONFIG(LCD_COLOR_FMT_RGB565);
+#endif
+    dpi_config.num_fbs = CONFIG_BSP_LCD_DPI_BUFFER_NUMS;
+
+    jd9366_vendor_config_t vendor_config = {
+        .mipi_config = {
+            .dsi_bus = mipi_dsi_bus,
+            .dpi_config = &dpi_config,
+        },
+    };
+    const esp_lcd_panel_dev_config_t lcd_dev_config = {
+        .reset_gpio_num = BSP_LCD_RST,
+        .rgb_ele_order = BSP_LCD_COLOR_SPACE,
+        .bits_per_pixel = 16,
+        .vendor_config = &vendor_config,
+    };
+    ESP_GOTO_ON_ERROR(esp_lcd_new_panel_jd9366(io, &lcd_dev_config, &disp_panel), err, TAG, "New LCD panel JD9366 failed");
+#else
     // create JD9365 control panel
     ESP_LOGI(TAG, "Install JD9365 LCD control panel");
 #if CONFIG_BSP_LCD_COLOR_FORMAT_RGB888
@@ -461,6 +511,7 @@ esp_err_t bsp_display_new_with_handles(const bsp_display_config_t *config, bsp_l
         .vendor_config = &vendor_config,
     };
     ESP_GOTO_ON_ERROR(esp_lcd_new_panel_jd9365(io, &lcd_dev_config, &disp_panel), err, TAG, "New LCD panel JD9365 failed");
+#endif
     ESP_GOTO_ON_ERROR(esp_lcd_panel_reset(disp_panel), err, TAG, "LCD panel reset failed");
     ESP_GOTO_ON_ERROR(esp_lcd_panel_init(disp_panel), err, TAG, "LCD panel init failed");
     ESP_GOTO_ON_ERROR(esp_lcd_panel_disp_on_off(disp_panel, true), err, TAG, "LCD panel ON failed");
@@ -502,20 +553,25 @@ esp_err_t bsp_touch_new(const bsp_touch_config_t *config, esp_lcd_touch_handle_t
     const esp_lcd_touch_config_t tp_cfg = {
         .x_max = BSP_LCD_H_RES,
         .y_max = BSP_LCD_V_RES,
-        .rst_gpio_num = BSP_LCD_TOUCH_RST, // Shared with LCD reset
+        .rst_gpio_num = BSP_LCD_TOUCH_RST,
         .int_gpio_num = BSP_LCD_TOUCH_INT,
         .levels = {
             .reset = 0,
             .interrupt = 0,
         },
         .flags = {
-            .swap_xy = 0,
-            .mirror_x = 1,
-            .mirror_y = 0,
+            /* Per-board, and tied to BSP_LCD_ROTATION -- see docs/board-port.md */
+            .swap_xy = BSP_LCD_TOUCH_SWAP_XY,
+            .mirror_x = BSP_LCD_TOUCH_MIRROR_X,
+            .mirror_y = BSP_LCD_TOUCH_MIRROR_Y,
         },
     };
     esp_lcd_panel_io_handle_t tp_io_handle = NULL;
+#if CONFIG_BSP_BOARD_OSPTEK_JD9366
+    esp_lcd_panel_io_i2c_config_t tp_io_config = ESP_LCD_TOUCH_IO_I2C_JD9366_CONFIG();
+#else
     esp_lcd_panel_io_i2c_config_t tp_io_config = ESP_LCD_TOUCH_IO_I2C_GSL3680_CONFIG();
+#endif
     tp_io_config.scl_speed_hz = CONFIG_BSP_I2C_CLK_SPEED_HZ;
     ret = esp_lcd_new_panel_io_i2c(i2c_handle, &tp_io_config, &tp_io_handle);
     if (ret != ESP_OK) {
@@ -523,13 +579,22 @@ esp_err_t bsp_touch_new(const bsp_touch_config_t *config, esp_lcd_touch_handle_t
         return ret;
     }
     ESP_LOGI(TAG, "Touch I2C IO handle created");
-    
+
+#if CONFIG_BSP_BOARD_OSPTEK_JD9366
+    ret = esp_lcd_touch_new_i2c_jd9366(tp_io_handle, &tp_cfg, ret_touch);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to create JD9366 in-cell touch controller: %s", esp_err_to_name(ret));
+        return ret;
+    }
+    ESP_LOGI(TAG, "JD9366 in-cell touch controller created successfully");
+#else
     ret = esp_lcd_touch_new_i2c_gsl3680(tp_io_handle, &tp_cfg, ret_touch);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to create GSL3680 touch controller: %s", esp_err_to_name(ret));
         return ret;
     }
     ESP_LOGI(TAG, "GSL3680 touch controller created successfully");
+#endif
     return ESP_OK;
 }
 
@@ -657,6 +722,19 @@ lv_display_t *bsp_display_start_with_config(const bsp_display_cfg_t *cfg)
     BSP_NULL_CHECK(disp = bsp_display_lcd_init(cfg), NULL);
 
     BSP_NULL_CHECK(disp_indev = bsp_display_indev_init(disp), NULL);
+
+    /* The board owns the rotation (BSP_LCD_ROTATION in the BSP header), because
+     * the angle and the touch mirror/swap flags are one contract: LVGL maps
+     * touch input through the display rotation, so applying one without the
+     * other leaves the UI upright but the touch inverted. */
+    lvgl_port_lock(0);
+    lv_display_set_rotation(disp, BSP_LCD_ROTATION);
+    lvgl_port_unlock();
+#if CONFIG_BSP_BOARD_OSPTEK_JD9366
+    ESP_LOGI(TAG, "Display rotation: 90 deg (1280x800 landscape, PPA)");
+#else
+    ESP_LOGI(TAG, "Display rotation: 270 deg (1280x800 landscape, CPU)");
+#endif
 
     return disp;
 }

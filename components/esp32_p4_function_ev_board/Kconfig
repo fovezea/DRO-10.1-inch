@@ -1,5 +1,27 @@
 menu "Board Support Package(ESP32-P4)"
 
+    choice BSP_BOARD
+        prompt "Select board"
+        default BSP_BOARD_EV_JD9365
+        help
+            Which board this BSP is built for. See docs/board-port.md.
+
+            The board owns its panel, touch controller, backlight/reset wiring,
+            audio amplifier pin and LVGL rotation. Rotation and the touch
+            mirror/swap flags are one contract: LVGL maps touch input through
+            the display rotation, so they must change together.
+
+            The SoC-level profile (P4 revision family, co-processor target) is
+            selected separately at configure time: -DDRO_BOARD=guition|osptek
+            picks sdkconfig / sdkconfig.osptek.
+
+        config BSP_BOARD_EV_JD9365
+            bool "Guition ESP32-P4 module + JD9365 (P4 rev < 3.0)"
+
+        config BSP_BOARD_OSPTEK_JD9366
+            bool "osptek ESP32-P4C5 + JD9366 in-cell touch (P4 rev >= 3.0)"
+    endchoice
+
     config BSP_ERROR_CHECK
         bool "Enable error check in BSP"
         default y

@@ -345,9 +345,6 @@ static void ui_creation_task(void *pvParameters)
     // Lock LVGL for thread safety
     lvgl_port_lock(0);
     
-    // Set display rotation to 270° landscape
-    lv_display_set_rotation(lvgl_disp, LV_DISPLAY_ROTATION_270);
-    
     // Initialize EEZ Studio generated UI
     ui_init();
     
@@ -422,13 +419,10 @@ static esp_err_t app_display_init(void)
             ESP_LOGE(TAG, "Failed to turn on display backlight: %s", esp_err_to_name(backlight_ret));
         }
         
-        // Lock LVGL for thread safety if the port is running
-        lvgl_port_lock(0);
-        // Set initial rotation to 270° landscape
-        lv_display_set_rotation(lvgl_disp, LV_DISPLAY_ROTATION_270);
-        lvgl_port_unlock();
-        
-        ESP_LOGI(TAG, "Display initialized with LVGL software rotation");
+        // Rotation is not set here: the BSP applies BSP_LCD_ROTATION together
+        // with the matching touch flags, so one board cannot inherit the
+        // other's orientation (docs/board-port.md section 1).
+        ESP_LOGI(TAG, "Display initialized; rotation is applied by the BSP board definition");
         return ESP_OK;
     } else {
         ESP_LOGE(TAG, "BSP display initialization failed");

@@ -52,10 +52,23 @@
 #define BSP_I2S_LCLK          (GPIO_NUM_10)
 #define BSP_I2S_DOUT          (GPIO_NUM_9)
 #define BSP_I2S_DSIN          (GPIO_NUM_11)
+#if CONFIG_BSP_BOARD_OSPTEK_JD9366
+#define BSP_POWER_AMP_IO      (GPIO_NUM_53)
+#else
 #define BSP_POWER_AMP_IO      (GPIO_NUM_20)
+#endif
 
 /* Display */
-#if CONFIG_BSP_LCD_TYPE_1024_600
+#if CONFIG_BSP_BOARD_OSPTEK_JD9366
+/* The osptek carrier holds LCD reset on power-up and drives the backlight from
+ * an always-on boost converter, so neither is wired to the SoC. Touch reset and
+ * interrupt are not wired either: the JD9366 in-cell driver resets the touch
+ * engine over I2C (BackDoor) and is polled. */
+#define BSP_LCD_BACKLIGHT     (GPIO_NUM_NC)
+#define BSP_LCD_RST           (GPIO_NUM_NC)
+#define BSP_LCD_TOUCH_RST     (GPIO_NUM_NC)
+#define BSP_LCD_TOUCH_INT     (GPIO_NUM_NC)
+#elif CONFIG_BSP_LCD_TYPE_1024_600
 #define BSP_LCD_BACKLIGHT     (GPIO_NUM_26)
 #define BSP_LCD_RST           (GPIO_NUM_27)
 #define BSP_LCD_TOUCH_RST     (GPIO_NUM_NC)
@@ -65,6 +78,20 @@
 #define BSP_LCD_RST           (GPIO_NUM_27)
 #define BSP_LCD_TOUCH_RST     (GPIO_NUM_22)
 #define BSP_LCD_TOUCH_INT     (GPIO_NUM_21)
+#endif
+
+/* Touch orientation. These belong to the board together with BSP_LCD_ROTATION:
+ * LVGL maps touch input through the display rotation, so changing one without
+ * the other leaves the UI upright but the touch inverted (docs/board-port.md
+ * section 1). */
+#if CONFIG_BSP_BOARD_OSPTEK_JD9366
+#define BSP_LCD_TOUCH_SWAP_XY   (0)
+#define BSP_LCD_TOUCH_MIRROR_X  (0)
+#define BSP_LCD_TOUCH_MIRROR_Y  (0)
+#else
+#define BSP_LCD_TOUCH_SWAP_XY   (0)
+#define BSP_LCD_TOUCH_MIRROR_X  (1)
+#define BSP_LCD_TOUCH_MIRROR_Y  (0)
 #endif
 
 /* uSD card */
@@ -261,6 +288,18 @@ esp_err_t bsp_sdcard_unmount(void);
 #define BSP_LCD_PIXEL_CLOCK_MHZ     (80)
 
 #if (BSP_CONFIG_NO_GRAPHIC_LIB == 0)
+
+/* Portrait panels mounted differently, so the two boards land on opposite
+ * landscape orientations: 270 deg on the Guition, 90 deg on the osptek. Both
+ * are already correct on their hardware -- this is work not to break, and it
+ * must stay next to the per-board touch flags above. The engine follows the
+ * profile: CPU rotation on the Guition, PPA on the osptek
+ * (CONFIG_LVGL_PORT_ENABLE_PPA in sdkconfig.osptek). */
+#if CONFIG_BSP_BOARD_OSPTEK_JD9366
+#define BSP_LCD_ROTATION           LV_DISPLAY_ROTATION_90
+#else
+#define BSP_LCD_ROTATION           LV_DISPLAY_ROTATION_270
+#endif
 
 #define BSP_LCD_DRAW_BUFF_SIZE     (BSP_LCD_H_RES * 80) // Original buffer size for stability
 #define BSP_LCD_DRAW_BUFF_DOUBLE   (0)  // Disable double buffering to save memory
