@@ -1,6 +1,6 @@
 # ESP32-P4 DRO (Digital Readout) & Electronic Leadscrew (work in progress) 
 
-This project provides a complete Digital Readout (DRO) and Electronic Leadscrew (ELS) system for milling machines and lathes using the JC8012P4A1C 10.1-inch ESP32-P4 display board. It features a modern, high-performance HMI built with LVGL 9.2, designed with a **"Smart Client, Dumb Backend"** philosophy. The board works in horisontal mode without tearing 
+This project provides a complete Digital Readout (DRO) and Electronic Leadscrew (ELS) system for milling machines and lathes, running on a 10.1-inch ESP32-P4 display board. Two carrier boards are supported and selected at build time: the Guition JC8012P4A1C (JD9365 panel, ESP32-P4 + ESP32-C6) and the osptek ESP32-P4C5 module (JD9366 panel with in-cell touch, ESP32-P4 rev v3.2 + ESP32-C5 dual-band). It features a modern, high-performance HMI built with LVGL 9.2, designed with a **"Smart Client, Dumb Backend"** philosophy. Both boards run the UI in horizontal mode without tearing.
 
 ## 🏗️ System Architecture (not fully implemented yet)
 
@@ -13,34 +13,73 @@ This project provides a complete Digital Readout (DRO) and Electronic Leadscrew 
 
 ## 🖥️ The Frontend (HMI)
 
-- **Main Board**: ESP32-P4 (JC8012P4A1C 10.1-inch board)
-- **Display**: 1280x800 MIPI-DSI LCD (JD9365 controller) in Landscape mode.
-- **Touch**: GSL3680 capacitive touch controller.
-- **UI Framework**: Strictly C-based LVGL (EEZ Studio generation is now deprecated, modifying `screens.c` directly).
+Two 10.1-inch ESP32-P4 carrier boards are supported, selected at build time. Both run the
+same 1280x800 landscape UI and the same application code; they differ in panel controller,
+touch controller, radio and P4 revision only.
 
-![frontend](res/1.jpg)
+### 1. JC8012P4A1C (Guition) -- `DRO_BOARD=guition` (default)
 
-## 🎛️ The Backend (Hardware Controllers)
+- **Panel**: 1280x800 MIPI-DSI, **JD9365** controller, rotated 270 deg on the CPU
+- **Touch**: **GSL3680** capacitive, separate controller
+- **Radio**: ESP32-C6 (2.4 GHz) over SDIO; co-processor built from `esp32c6_hosted_cp/`
+- **P4**: rev < 3.0
+- **Build**: `idf.py build` -- uses the tracked `sdkconfig`
 
-This project has completely migrated away from FPGA-based controllers. The Electronic Leadscrew and encoder tracking are now entirely driven by powerful ESP32-series dual-core and quad-core microcontrollers.
+Rotation is where most 10.1-inch ESP32-P4 builds get stuck. This one runs its 270 deg
+landscape rotation in LVGL on the CPU (PPA disabled), which on this panel gives a stable
+horizontal image without tearing -- the result looks effortless precisely because it is not.
 
-Because we use a unified **ESP-IDF Kconfig Architecture**, the same `esp32p4_usb_dro_backend` codebase targets multiple backend boards seamlessly by isolating pinouts into a multiplexed Board Support Package (`bsp.h`).
+![Guition JC8012P4A1C](res/1.jpg)
 
-### Supported Backend Hardware
+### 2. osptek ESP32-P4C5 module -- `DRO_BOARD=osptek`
 
-#### 1. ESP32-P4C6-osprey Baseboard
+- **Panel**: 1280x800 MIPI-DSI, **JD9366** controller, rotated 90 deg on the PPA
+- **Touch**: **JD9366 in-cell**, shares the I2C bus with the ES8311 codec
+- **Radio**: **ESP32-C5**, Wi-Fi 6 dual-band 2.4 + 5 GHz, over SDIO
+- **P4**: rev v3.2
+- **Build**: `idf.py -B build_osptek -DDRO_BOARD=osptek build` -- uses `sdkconfig.osptek`
 
-The primary high-performance development board.
-![Osprey P4 Baseboard](res/OspreyPI-P4C6.avif)
+![osptek ESP32-P4C5 board](res/osptek-p4c5-front.png)
 
-#### 2. ESP32-P4 WT9932P4-TINY
+![osptek ESP32-P4C5 module](res/osptek-p4c5-module.png)
 
-A compact ESP32-P4 variant with carefully re-routed USB tracking and bootstrap pins to preserve USB-HID capability without stepper collision.
-![TINY P4 Board](res/TINY.webp)
+The C5 leaves the factory with a **blank flash**: the co-processor image in
+[`firmware/`](firmware/README.md) has to be written before the hosted link exists at all.
+How the board was brought up, and why the two profiles exist:
+[`docs/board-port.md`](docs/board-port.md).
 
-#### 3. ESP32-S3 Generic Board
+### Side by side
 
-A cost-effective fallback for legacy ESP32-S3 dual-core architectures.
+| | Guition JC8012P4A1C | osptek ESP32-P4C5 |
+| :--- | :--- | :--- |
+| Panel controller | JD9365 | JD9366 |
+| Touch | GSL3680 (separate IC) | JD9366 in-cell |
+| Rotation | 270 deg, CPU | 90 deg, PPA |
+| Radio | ESP32-C6, 2.4 GHz | ESP32-C5, 2.4 + 5 GHz |
+| P4 revision | rev < 3.0 | rev v3.2 |
+| sdkconfig | `sdkconfig` | `sdkconfig.osptek` |
+| Build | `idf.py build` | `-DDRO_BOARD=osptek` |
+
+The rotation and touch orientation belong to the board, not to the app: the BSP applies
+`BSP_LCD_ROTATION` (and matching touch flags) so the UI is upright and the touch mapping is
+correct on both.
+
+### Where to buy / vendor documentation
+
+- **osptek ESP32-P4C5 module and carrier** -- the board in section 2:
+  [GitHub](https://github.com/osptek/devboard-esp32p4c5_module) ·
+  [Gitee](https://gitee.com/osptek/devboard-esp32p4c5_module)
+- **Guition JC8012P4A1C** -- the board in section 1, sold through Taobao / AliExpress resellers.
+
+Both are bought through Chinese marketplaces. Product links are deliberately left out: individual
+listings expire, differ per region, and often ship a different panel than the photo suggests.
+
+> **Similar-looking boards are not drop-in compatible.** Several 10.1-inch ESP32-P4 carriers look
+> alike (Waveshare and other resellers of the same reference design), and they are close enough to
+> be tempting -- but four things decide whether a build works, and all four differ between the two
+> boards here: the panel controller (JD9365 vs JD9366), the touch arrangement (separate GSL3680 vs
+> JD9366 in-cell), the P4 revision (rev < 3.0 vs v3.2, mutually exclusive images) and the radio
+> co-processor (C6 vs C5). Check those before assuming compatibility.
 
 ---
 
@@ -58,7 +97,10 @@ A cost-effective fallback for legacy ESP32-S3 dual-core architectures.
 
 ```text
 DRO-10.1-inch/
-├── components/                        # Local frontend components
+├── components/
+│   ├── esp32_p4_function_ev_board/   # BSP: both boards (choice BSP_BOARD)
+│   ├── esp_lcd_jd9365/               # JD9365 panel driver (Guition board)
+│   ├── esp_lcd_jd9366/               # JD9366 panel + in-cell touch (osptek board)
 │   ├── dro_system/                   # Core DRO business logic & Axis mapping
 │   ├── eez/                          # LVGL UI implementation (Manual C edits)
 │   ├── frontend_usb/                 # USB Host HID driver bridging
@@ -68,6 +110,11 @@ DRO-10.1-inch/
 ├── esp32p4_usb_dro_backend/          # THE UNIFIED BACKEND REPOSITORY
 │   ├── main/                         # USB Device HID stack & ELS algorithm
 │   └── modules/BSP/                  # Multi-Board Support Package (Pinouts)
+├── esp32c6_hosted_cp/                # ESP-Hosted co-processor firmware for the C6
+├── firmware/                         # Prebuilt C5 co-processor image + flashing notes
+├── docs/board-port.md                # How the second board was brought up
+├── sdkconfig                         # Guition profile (DRO_BOARD=guition)
+├── sdkconfig.osptek                  # osptek profile (DRO_BOARD=osptek)
 └── README.md                         # This file
 ```
 
