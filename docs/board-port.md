@@ -8,49 +8,31 @@ Goal: one DRO application, two boards, selected at build time — the Guition bo
 today, and the osptek ESP32-P4C5 board from the HMI project. Repos stay separate; only the
 driver sources and a co-processor firmware image move from `HMI-10.1-esp32-p4c6`.
 
-## 1. Rotation: audited first, because it decides the design
+## 1. Rotation: already correct on both boards, keep it that way
 
-Both projects rotate in **LVGL**, not in the panel driver. `bsp_display_start()` registers the
-display at the panel's native 800×1280 with `rotation = {swap_xy: false, mirror_x: false,
-mirror_y: false}` and `sw_rotate = true`; `main.c` then calls `lv_display_set_rotation()`.
+Both projects rotate in **LVGL**, and both are already right for their own panel:
 
-So the "one board rotated in the driver, one in LVGL" risk does **not** materialise. Something
-else does:
-
-| | DRO / Guition (JD9365) | HMI / osptek (JD9366) |
+| | DRO / Guition | HMI / osptek |
 |---|---|---|
-| Angle | `LV_DISPLAY_ROTATION_270` | `LV_DISPLAY_ROTATION_90` |
-| Where applied | hardcoded in `main.c`, **twice** (lines ~349 and ~428) | hardcoded in `main.c`, once |
-| Rotation engine | **CPU** — `CONFIG_LVGL_PORT_ENABLE_PPA` is **not set** | **PPA** — `CONFIG_LVGL_PORT_ENABLE_PPA=y` |
-| Touch config | GSL3680, `mirror_x = 1`, x_max/y_max = 800×1280 | JD9366 in-cell, all flags 0 |
-| Native panel | 800×1280, rotated to 1280×800 logical | 800×1280, rotated to 1280×800 logical |
+| Angle | 270 deg | 90 deg |
+| Engine | CPU rotation (`CONFIG_LVGL_PORT_ENABLE_PPA` not set) | PPA (`LVGL_PORT_ENABLE_PPA=y`) |
+| Touch flags | GSL3680, `mirror_x = 1` | JD9366 in-cell, all zero |
+| Result | 1280x800 landscape | 1280x800 landscape |
 
-Three facts follow:
+The angles differ by 180 deg because the panels are mounted differently. Both are already
+correct on their hardware, so this is not work to do -- it is work not to break.
 
-1. **The two boards sit 180° apart.** 270 vs 90 both yield a 1280×800 logical screen, but the
-   content is flipped. Dropping the osptek BSP into DRO with `main.c` still at 270 would show
-   the UI upside down — silently, because the resolution matches.
-2. **The angle lives in the wrong place.** It is a property of how the panel is mounted on a
-   particular board, yet DRO has it in `main.c` (in two independent init paths, which can drift
-   apart). Any board port that leaves it there is a landmine.
-3. **The rendering engines differ.** The osptek path was verified with PPA; DRO runs CPU
-   rotation with PPA off. That may be *why* DRO rotates in CPU: your note that the JD9365 driver
-   "did not cooperate" suggests PPA rotation was tried and abandoned there. Keep each board on
-   the mechanism that is proven for it rather than forcing one.
+What the port preserves:
 
-Also: touch coordinates are mapped through the display rotation, so **changing the angle
-invalidates the touch calibration**. DRO's `mirror_x = 1` was tuned against 270°; the osptek
-in-cell driver was verified with all-zero flags at 90°. Each pair (angle, touch flags) must be
-validated together on real hardware.
+1. Each board keeps its own (angle, engine) pair. Do not unify them: PPA is proven on the
+   osptek board and disabled on the Guition board for a reason.
+2. Touch flags travel with the angle. Changing one without the other inverts touch input,
+   and LVGL maps touch through the display rotation.
+3. The angle is currently hardcoded in `main.c` (twice in DRO). When the BSP gains a board
+   choice, move it next to the board definition so a new board cannot inherit the wrong
+   angle. Cheap, and the only real trap in this area.
 
-### The rotation contract this port will enforce
-
-- One angle per board, defined in the **BSP**, applied exactly once inside
-  `bsp_display_start()`. `main.c` stops calling `lv_display_set_rotation()` at all.
-- One rendering mechanism per board, selected by Kconfig: `BSP_DISPLAY_ROTATE_PPA` (osptek,
-  proven) or CPU rotation (Guition, current behaviour — do not change what works).
-- Touch flags per board, next to the angle, with a comment tying them to it.
-- Acceptance for every board: UI upright **and** a dragged slider that tracks the finger.
+Acceptance for any board: UI upright **and** a dragged slider that tracks the finger.
 
 ## 2. Board comparison (corrected)
 
@@ -141,15 +123,20 @@ channels), and one DRO-specific smoke test (axis readout / UI navigation).
 
 ## 7. Open questions
 
-1. **Is DRO's panel really JD9365?** DRO instantiates `esp_lcd_jd9365`, which matches your earlier
-   statement; if the Guition board turns out to be JD9366 as well, S2/S3 shrink to pins + rotation.
-2. **Was 270° chosen arbitrarily or is it the panel's physical mounting?** It must stay 270 for
-   this board either way, but knowing why tells us whether the osptek angle is fixed at 90 or
-   needs measuring.
-3. **Touch on the Guition board** — GSL3680 or GT911? DRO's BSP instantiates GSL3680; confirm on
-   hardware before touching that path.
-4. **Does the 9365 path still boot and rotate correctly today?** It is the baseline; S3 must not
-   disturb it, so run the matrix on it *before* adding the second board.
+Resolved:
+
+- **Panels** -- the Guition board really is JD9365; the osptek board is JD9366 with in-cell
+  touch on the same I2C bus. That is the basis for S2/S3 as written.
+- **Rotation** -- both boards are already correctly rotated in their own projects (270 deg / CPU
+  on Guition, 90 deg / PPA on osptek). Nothing to re-derive; see section 1.
+
+Outstanding:
+
+1. **Touch controller on the Guition board** -- GSL3680 or GT911? DRO's BSP instantiates
+   GSL3680; confirm on hardware before touching that path.
+2. **Does the JD9365 path still boot and rotate correctly today?** It is the baseline, so run the
+   test matrix on it *before* adding the second board, to be able to tell a regression from a
+   pre-existing fault.
 
 ## 8. Git
 
