@@ -41,3 +41,7 @@ esp32c6_hosted_cp/sdkconfig.old
 # Build logs
 *.log
 
+
+# S4: per-profile build dir (e.g. -B build_osptek)
+build_*/
+
