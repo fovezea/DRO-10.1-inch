@@ -280,8 +280,10 @@ static void wifi_scan_task(void *pvParameters)
     // Print results
     print_wifi_scan_results();
     
-    // Update UI with scan results using EEZ component
-    eez_ui_update_wifi_list(ap_info, ap_count);
+    // The eez_ui WiFi scanner screen is never created (eez_ui_create_screen()
+    // has no caller and the generated UI has no WiFi objects), so calling
+    // eez_ui_update_wifi_list() here only logged "WiFi list not initialized".
+    // Re-wire this if that screen is ever added to the UI.
     
     vTaskDelete(NULL);
 }

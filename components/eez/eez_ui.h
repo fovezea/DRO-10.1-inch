@@ -1,3 +1,18 @@
+/*
+ * Status: NOT WIRED into the DRO application.
+ *
+ * This is a standalone "WiFi scanner" screen prototype. eez_ui_init(),
+ * eez_ui_create_screen() and the callback registrations have no callers in this
+ * project, and the generated EEZ UI (components/eez/generated) contains no WiFi
+ * objects. Scan results therefore go to the console only, and the
+ * "WiFi list not initialized" error from eez_ui_update_wifi_list() means the
+ * screen was never created: it is not a fault, and not calling it from the scan
+ * task is deliberate. Network association is not implemented at all.
+ *
+ * See components/eez/README.md ("Status") and docs/board-port.md before
+ * treating WiFi behaviour as a regression.
+ */
+
 #pragma once
 
 #include "lvgl.h"

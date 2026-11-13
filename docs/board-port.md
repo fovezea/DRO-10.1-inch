@@ -1,6 +1,7 @@
 # Board port: adding the osptek ESP32-P4C5 (JD9366) board to DRO
 
-Status: S1–S4 implemented, S5–S6 outstanding. Branch `feature/board-port`, cut from
+Status: S1–S4 implemented; S3 verified on **both boards on hardware**. S5 and the rest of
+the S6 matrix (audio, TF card, Wi-Fi) outstanding. Branch `feature/board-port`, cut from
 `feature/idf6.1` because no local `dev` existed at the time; rebase onto `dev` once it has
 been fetched and merged (see §8).
 
@@ -149,18 +150,27 @@ Resolved:
   touch on the same I2C bus. That is the basis for S2/S3 as written.
 - **Rotation** -- both boards are already correctly rotated in their own projects (270 deg / CPU
   on Guition, 90 deg / PPA on osptek). Nothing to re-derive; see section 1.
+- **Guition touch controller** -- GSL3680. On hardware the driver reports
+  `GSL3680 touch controller created successfully` and the slider tracks the finger; GT911 is
+  not involved.
+- **JD9365 baseline** -- boots at 270 deg / CPU rotation with working touch on the Guition
+  (rev v1.0). S3's hardware check therefore passed on both boards, not just the builds.
 
 Outstanding:
 
-1. **Touch controller on the Guition board** -- GSL3680 or GT911? DRO's BSP instantiates
-   GSL3680; confirm on hardware before touching that path.
-2. **Does the JD9365 path still boot and rotate correctly today?** It is the baseline, so run the
-   test matrix on it *before* adding the second board, to be able to tell a regression from a
-   pre-existing fault. Still open: S3 only proves the Guition build, not its rotation on glass.
-3. **TF card on the osptek board** -- the plan's pin table puts card detect on GPIO45, but
+1. **TF card on the osptek board** -- the plan's pin table puts card detect on GPIO45, but
    `bsp_sdcard_mount()` still mounts slot 0 (IOMUX, 39-44) with `NO_CD`, exactly as on the
    Guition. A card should mount; insertion/removal will not be detected. Wire `.cd` only after
    confirming 45 is actually the detect switch on the carrier.
+2. **WiFi on the Guition (known, NOT a port regression)** -- the C6 co-processor runs
+   esp_hosted **2.8.0** while the host builds **3.1.0**, so the boot log shows
+   `major version mismatch — OTA coprocessor from host`. It is a recommendation, not a failure:
+   the link comes up (`CP without SDIO SW_AGGR; compatible streaming mode enabled`) and scans
+   work. This was verified on the same board with both the `c9ba7b1` (idf6.1) and `a8a06bd`
+   images -- identical behaviour, so the board port did not cause it. Association is not
+   implemented, and the on-screen WiFi list is an unwired prototype in `components/eez` (see
+   its README "Status" section). Removing the mismatch means flashing the C6 with
+   `esp32c6_hosted_cp`; WiFi is out of scope until it is prioritised.
 
 ## 8. Git
 

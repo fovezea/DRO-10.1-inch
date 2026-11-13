@@ -1,3 +1,11 @@
+/*
+ * Status: NOT WIRED into the DRO application -- see the banner in eez_ui.h and
+ * the "Status" section of components/eez/README.md before changing anything
+ * here. In short: nothing calls eez_ui_init()/eez_ui_create_screen(), so
+ * s_wifi_list is always NULL and every call to eez_ui_update_wifi_list() fails
+ * by design. That failure is not a symptom of a broken WiFi link.
+ */
+
 #include "eez_ui.h"
 #include "esp_log.h"
 #include "esp_wifi.h"

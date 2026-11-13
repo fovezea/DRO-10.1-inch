@@ -2,6 +2,26 @@
 
 This component provides integration between EEZ Studio generated LVGL UI files and the ESP32-P4 WiFi Scanner application.
 
+## Status: not wired into the DRO application
+
+Everything below describes the intended integration, not the current one. In this
+project:
+
+- `eez_ui_init()`, `eez_ui_create_screen()` and the callback registrations have
+  no callers, and `components/eez/generated` contains no WiFi objects, so this
+  scanner screen is never displayed.
+- Scan results are printed to the console only. `main/main.c` deliberately does
+  not call `eez_ui_update_wifi_list()` -- while the screen does not exist that
+  call can only fail, so `EEZ_UI: WiFi list not initialized` is expected and is
+  **not** a fault.
+- Connecting to a network is not implemented (`network_selected_callback` is a
+  stub).
+
+WiFi is not a priority for the current board port; see `docs/board-port.md`.
+To bring the screen back: call `eez_ui_init()` + `eez_ui_create_screen()` at
+startup, register the callbacks, and restore the `eez_ui_update_wifi_list()`
+call in the scan task.
+
 ## Directory Structure
 
 ```
