@@ -133,15 +133,31 @@ frontend's own regulator is not there to supply. The plate should generate its o
 
 ## 4. Proposed allocation
 
-All on J2, so the plate mates with one header; J4 stays untouched for the C5 side.
+Two headers, two jobs -- which is what makes the plates interchangeable. The frontend-backend link
+goes on **J4**, the backend-counter SPI on **J2**, because the PoE adapter needs J2's high GPIOs
+(section 5).
+
+### J4: frontend <-> backend link
+
+| Signal | GPIO | J4 pin | Direction |
+|---|---|---|---|
+| `BB_UART_TX` | 20 | 31 | frontend -> backend |
+| `BB_UART_RX` | 21 | 32 | backend -> frontend |
+| `BB_IRQ` | 22 | 33 | backend -> frontend, optional |
+| `BB_RESET` | 23 | 34 | frontend -> backend |
+| `BB_BOOT` | 1 | 18 | frontend -> backend, optional |
+
+These five are the only J4 GPIOs that are both free and clear of the PoE reservation. If a sixth is
+ever needed, GPIO3-5 (J4 pins 20-22) are available at the cost of JTAG.
+
+This is also the **entire** interconnection between two stacked dev boards: 5 V, GND and the UART
+pair are the minimum, so a four-wire link (5 V, GND, TX, RX) is enough to bring a backend up, with
+the remaining three for recovery and events.
+
+### J2: backend <-> quadrature plate
 
 | Signal | GPIO | J2 pin | Direction |
 |---|---|---|---|
-| `BB_UART_TX` | 38 | 19 | frontend -> backend |
-| `BB_UART_RX` | 36 | 21 | backend -> frontend |
-| `BB_IRQ` | 37 | 22 | backend -> frontend, optional |
-| `BB_RESET` | 34 | 23 | frontend -> backend |
-| `BB_BOOT` | 35 | 24 | frontend -> backend, optional |
 | `SPI_SCK` | 32 | 25 | backend -> counters |
 | `SPI_MOSI` | 33 | 26 | backend -> counters |
 | `SPI_MISO` | 30 | 27 | counters -> backend |
@@ -150,13 +166,15 @@ All on J2, so the plate mates with one header; J4 stays untouched for the C5 sid
 | `CS2` | 29 | 30 | backend -> counter 2 |
 | `CS3` | 26 | 31 | backend -> counter 3 |
 | `CS4` | 27 | 32 | backend -> counter 4 |
-| spare | 24 | 33 | |
-| spare | 25 | 34 | |
-| spare | 46-52 | 11, 12, 9, 7, 8, 5, 10 | for a future plate |
-| spare | 24, 25 | 33, 34 | |
+| `CNT_DRDY` | 24 | 33 | counters -> backend, optional |
+| `CNT_RESET` | 25 | 34 | backend -> counters, optional |
 
-The interleaving is deliberate: `CS0..CS4` land on adjacent pins (28-32) so the ribbon to the
-counter chips runs as one bundle, and the UART/RESET group sits next to them at 19-24.
+Note this uses GPIO33, which the PoE adapter wants for TX_EN -- so the quadrature plate and the PoE
+plate are mutually exclusive, which they already are by geometry. If a LAN-connected ELS is ever
+wanted, `SPI_MOSI` must move off GPIO33 first.
+
+**Pull-ups on CS0-CS4** (10 k to 3V3) on the quadrature plate: while the backend is resetting or
+absent, a floating chip select can clock garbage into a counter.
 
 ### Variant: counters on their own plate
 
@@ -192,7 +210,33 @@ only matter at the tens-of-MHz rates the counters never need. It does mean the p
 free rather than dictated by the IO MUX, which is why the allocation above is a proposal rather
 than a constraint.
 
-## 5. Frontend-backend transport
+## 5. PoE Ethernet adapter: reserved pins
+
+The optional 10/100BASE-TX + PoE adapter plugs onto the dev board headers and drives RMII. Its
+pins are therefore unavailable to any plate when it is fitted:
+
+| Signal | GPIO | Signal | GPIO | Signal | GPIO |
+|---|---|---|---|---|---|
+| RXD0 | 52 | TXD0 | 34 | 50M_CLK | 50 |
+| RXD1 | 47 | TXD1 | 35 | MDC | 53 |
+| CRS_DV | 51 | TX_EN | 33 | MDIO | 49 |
+| | | | | PHY_RESET | 36 |
+
+Two consequences:
+
+1. **GPIO33, 34, 35, 36, 47, 49-52** are spoken for. That is why the frontend-backend link moved to
+   J4: leaving it on J2 would have made the UART collide with PHY_RESET (36) and TXD0/TXD1 (34/35),
+   so a LAN-connected DRO with a backend would have been impossible.
+2. **GPIO53 (MDC) is the dev board's audio power-amp enable**, so the PoE adapter and the speaker
+   are mutually exclusive. Nothing to do about it, but worth knowing before wondering why audio
+   dies when the adapter is fitted.
+
+Open item: the README describes the adapter's connector as a **2x13P**, but the RMII GPIOs span J2
+positions 5 to 26 -- more than 13 positions apart -- so how the 26-pin connector maps onto the two
+2x17 headers is not established here. Read the adapter schematic
+(`ESP32-P4C5-Module_PoE-Ethernet-Adapter_Schematic_V1.2.pdf`) before assuming it occupies J2 alone.
+
+## 6. Frontend-backend transport
 
 **Proposed: UART.** Not forced by the silicon -- SPI would work -- but it is the better fit for
 what this link carries, and the choice is worth stating explicitly rather than assuming.
@@ -225,7 +269,7 @@ Bandwidth check for the plain-DRO plate: 32-byte frames at 1 kHz over the CH340C
 is 160-320 us of UART per frame -- feasible but not generous. A readout does not need 1 kHz;
 200 Hz is plenty and leaves large margin.
 
-## 6. Rules a plate must follow
+## 7. Rules a plate must follow
 
 1. **Reserve, don't discover.** If a plate needs a pin outside the table above, add it here
    first. Two plates inventing the same pin two years apart is the failure mode this document
@@ -240,7 +284,7 @@ is 160-320 us of UART per frame -- feasible but not generous. A readout does not
 5. **One plate, one purpose.** A plate that brings its own bulk connectors (the PoE adapter)
    occupies the slot rather than having another board stacked above it.
 
-## 7. Verification status
+## 8. Verification status
 
 Confirmed against the schematic, pin by pin:
 
