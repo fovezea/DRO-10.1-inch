@@ -171,9 +171,9 @@ the remaining three for recovery and events.
 | `STEP0` / `DIR0` | 34 / 35 | 23 / 24 | backend -> driver |
 | `STEP1` / `DIR1` | 36 / 37 | 21 / 22 | backend -> driver |
 | `STEP2` / `DIR2` | 38 / 46 | 19 / 11 | backend -> driver |
-| `ALM0` / `ALM1` / `ALM2` | 47 / 48 / 49 | 9 / 7 / 10 | **drivers -> backend (fault)** |
-| `ENA` (all drivers) | 50 | 8 | backend -> drivers, shared |
-| spare | 51, 52 | 5, -- | |
+| `ALM0` / `ALM1` / `ALM2` | 47 / 48 / 49 | 12 / 9 / 10 | **drivers -> backend (fault)** |
+| `ENA` (all drivers) | 50 | 7 | backend -> drivers, shared |
+| spare | 51, 52 | 8, 5 | |
 
 The alarm inputs are what makes a stalled stepper safe: the drivers report faults, and the backend can
 stop motion instead of continuing to command a motor that cannot move. ENA is deliberately shared --
