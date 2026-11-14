@@ -100,24 +100,36 @@ than a constraint.
 
 ## 4. Frontend-backend transport
 
-**UART replaces USB.** This is the change the stack enables.
+**Proposed: UART.** Not forced by the silicon -- SPI would work -- but it is the better fit for
+what this link carries, and the choice is worth stating explicitly rather than assuming.
 
-| | USB HID (today) | UART on the bus (stacked) |
+The requirement is small: 5 axes x 4 bytes + sequence + tick + CRC is about 32 bytes, so 8 kB/s
+at 250 Hz and 32 kB/s at 1 kHz. The ELS loop itself runs on the backend, so nothing time-critical
+crosses this link.
+
+| | UART (2 wires + IRQ) | SPI (4 wires + IRQ) |
 |---|---|---|
-| Frontend drivers | USB host + HID class | UART only |
-| Backend drivers | USB device + HID class | UART only |
-| Cable | required | none |
-| Latency | USB frames, ~1 ms | bounded by baud and framing |
-| Bandwidth at 1 Mbaud | plenty | ~100 kB/s -- far above the ~10 kB/s telemetry needs |
+| Throughput | 100 kB/s @1 Mbaud, 300 @3 | ~1.2 MB/s @10 MHz |
+| 32-byte frame | 320 us @1 Mbaud, 107 us @3 | 26 us |
+| Duty at 250 Hz | 8 % @1 Mbaud | 0.7 % |
+| Clocking | async, no skew across a connector | shared clock, needs solid grounding |
+| Framing | byte framing required (length+CRC or COBS) | hardware-framed, CS delimits |
+| Roles | symmetric | master/slave, frontend must be master |
+| Pins | 2 | 4 |
 
-Keep the **application framing** identical to what the USB path uses (sequence, tick, 5x 32-bit
-positions, status, CRC) and keep the **capability handshake**: a plain-DRO backend reports no
-ELS, and the UI hides gearing. That way the frontend has one protocol and three possible
-transports -- HID (existing boards over USB), UART-on-stack, and CDC (the CH340C plate) -- and
-none of the application code cares which is in use.
+UART wins on simplicity: no clock crossing a connector, no role asymmetry, half the pins, and 8 %
+duty even at 1 Mbaud. SPI wins only if the backend ever has to stream something dense -- raw
+4 kHz counter data for a scope-style view, or a future plate with many more channels. That is a
+product question, not a technical one, and the cost of being wrong in the UART direction is a
+respin; the cost of reserving the two extra pins for SPI now is nothing.
 
-Both UARTs are free (UART0 is the console), so this costs no dedicated peripheral, and DMA on
-the P4 keeps the ISR load trivial at these rates.
+Whatever the carrier: keep the **same frame layout as the USB HID protocol** (sequence, tick,
+positions, status, CRC) and the capability handshake, so the frontend has one parser and three
+transports (HID, UART-on-stack, CDC).
+
+Bandwidth check for the plain-DRO plate: 32-byte frames at 1 kHz over the CH340C at 1-2 Mbaud
+is 160-320 us of UART per frame -- feasible but not generous. A readout does not need 1 kHz;
+200 Hz is plenty and leaves large margin.
 
 ## 5. Rules a plate must follow
 
