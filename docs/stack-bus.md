@@ -231,10 +231,13 @@ Two consequences:
    are mutually exclusive. Nothing to do about it, but worth knowing before wondering why audio
    dies when the adapter is fitted.
 
-Open item: the README describes the adapter's connector as a **2x13P**, but the RMII GPIOs span J2
-positions 5 to 26 -- more than 13 positions apart -- so how the 26-pin connector maps onto the two
-2x17 headers is not established here. Read the adapter schematic
-(`ESP32-P4C5-Module_PoE-Ethernet-Adapter_Schematic_V1.2.pdf`) before assuming it occupies J2 alone.
+The adapter's **2x13P** connector mates with only part of the 2x17 header -- it overlaps a subset of
+the positions rather than spanning the whole edge -- so the RMII GPIOs are reached through that
+overlap and the rest of the header stays available. Nothing unusual, and it means the adapter can be
+fitted without removing the header's other functions.
+
+What matters for plates is unchanged: **GPIO33, 34, 35, 36, 47, 49, 50, 51, 52 and 53** are not
+available while the adapter is fitted.
 
 ## 6. Frontend-backend transport
 
