@@ -169,28 +169,40 @@ The backend plate is small -- it sits behind a 72x52 mm dev board and carries th
 their buffers, five DB9s and a 5 V input. A full-size 88-pin stamp would turn it into a second
 full board, so the module is chosen for compactness, not pin count.
 
-**Chosen: M5Stamp ESP32P4** (M5Stack S013, also at DigiKey and The Pi Hut). P4-only, so no radio
-the product does not need, and small enough to sit beside five LS7366R on one plate.
+**Chosen: M5Stamp ESP32P4**, built on the Espressif **ESP32-P4NRW32** module. P4-only, so no
+radio the product does not need, and compact enough to sit beside five LS7366R on one plate.
 
-Five things to confirm on the exact variant before the footprint is drawn:
+Confirmed from the vendor's own product data:
 
-1. **P4 revision** -- v1.x (360 MHz) or v3.x (400 MHz). Decides the backend firmware family and
-   is not changeable later without a different module.
-2. **Free GPIOs** -- ~20 needed: 3 SPI, 5 CS, 2 UART, IRQ, reset, boot, 3 step/dir.
-3. **PSRAM / flash** -- enough for ELS math and buffers; the P4-Core's 16 MB / 32 MB is the
-   yardstick.
-4. **5 V in and 3.3 V out** -- the plate needs its own 3.3 V rail for the LS7366Rs, so either
-   the module supplies it or the plate's regulator feeds both.
-5. **Footprint and pitch** -- castellated; socket it rather than soldering if possible.
+| Item | Value | Consequence |
+|---|---|---|
+| Module | ESP32-P4NRW32 | Espressif module, so its datasheet is authoritative |
+| Clock | 360 MHz + 40 MHz LP core | **P4 rev v1.x** |
+| Memory | 16 MB flash + 32 MB PSRAM | matches the osptek P4-Core |
+| Package | **SMT and DIP** (castellated + 2.54 mm) | the first plate can be **socketed**, not reflowed |
+| Multimedia | MIPI CSI/DSI broken out | so GPIO breakout is not a concern -- it exposes far more than the ~20 needed |
+
+Still to confirm before layout:
+
+1. **Supply.** P4 modules are 3.3 V; the plate then needs its own 5 V -> 3.3 V buck feeding both
+   the module and the five LS7366Rs. Confirm whether the module expects 3.3 V only, and whether
+   the MIPI PHY rails (2.8 V / 1.8 V) are required when MIPI is unused -- for a backend with no
+   display they should be tie-off-able, as on the osptek P4-Core.
+2. **Pin count and pitch.** "SMT/DIP" means it can be socketed, which is what makes a first
+   prototype plate practical. Get the number of castellated/DIP pins and their arrangement from
+   the ESP32-P4NRW32 datasheet before drawing the footprint.
 
 **Fallback: osptek ESP32-P4-Core** -- P4-only (no radio), 88-pin stamp, 16 MB flash / 32 MB
-PSRAM, 360 MHz (rev v1.x), fully documented. Larger, so the plate becomes full-size, but its
-specs are not in question. Note it is not footprint-compatible with the frontend's P4C5 stamp:
-the same physical positions are the C5's UART on one module and LDO enables on the other.
+PSRAM, 360 MHz (rev v1.x), fully documented, and its pin definition is already mirrored in this
+project. Larger, so the plate becomes full-size, but its specs are not in question. Note it is
+not footprint-compatible with the frontend's P4C5 stamp: the same physical positions are the
+C5's UART on one module and LDO enables on the other.
+
+Because both candidates are rev v1.x, the backend firmware sits in the same revision family as
+the Guition frontend -- the existing rev-family switch covers it with no new mechanism.
 
 > **Revision is the purchasing constraint.** ESP32-P4 ships as v1.x (360 MHz, shield unmarked)
-> and v3.x (400 MHz, shield marked "X"); firmware for one refuses to run on the other. Pick one
-> and buy stock.
+> and v3.x (400 MHz, shield marked "X"); firmware for one refuses to run on the other.
 
 ### Product line-up
 
