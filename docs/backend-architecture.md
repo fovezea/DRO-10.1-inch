@@ -197,13 +197,16 @@ Still to confirm before layout:
 The counter SPI is the plate's core function, so it is the first filter any candidate module
 must pass -- cheaper modules have already failed it.
 
-1. **A full SPI2 must be free.** On the P4, SPI0/SPI1 are bonded to the in-package flash and
-   PSRAM; only SPI2 is general-purpose through the GPIO matrix. A module optimised for displays
-   tends to expose the MIPI lanes plus a few control pins, and not enough free GPIOs to give
-   SPI2 a clock, two data lines and **five chip selects**.
-2. **>=20 free GPIOs**, of which 8 are SPI2-capable (3 signals + 5 CS), plus 2 UART, IRQ,
-   reset, boot and 3 step/dir.
+1. **>=20 free GPIOs.** SPI2 needs no dedicated pads: the ESP32-P4 IO MUX lists dedicated
+   `SPI2_CK/D/Q/CS` on GPIO6-11 only as the default alias (F3), and the GPIO matrix routes SPI2
+   to *any* GPIO. At the 10 MHz this plate runs, matrix routing is more than adequate. So a
+   module is judged on how many free GPIOs it exposes, not on whether it happens to name them
+   SPI2.
+2. **Eight of those for the counter bus** (3 signals + 5 CS), plus 2 UART, IRQ, reset, boot and
+   3 step/dir.
 3. **P4-only**, no radio co-processor: the frontend already has one.
+   (GPIO2-5 default to MTCK/MTDI/MTMS/MTDO, so using them as GPIO costs JTAG debug -- acceptable
+   on a plate, but not the first choice.)
 4. **Socketable**, 2.54 mm preferred -- a socketed first prototype is worth more than a cheaper
    module that must be reflowed to be evaluated.
 

@@ -86,6 +86,18 @@ scale standard), these become the bus signals -- reserved now so that plate stay
 The bottom plate is the **source**; everything above it is a **sink** and must pass the rail it
 does not consume through a wide pour between the header rows, not through tracks.
 
+### A routing constraint on the counter SPI
+
+The ESP32-P4's dedicated `SPI2_CS/D/CK/Q/WP/HOLD` alias sits on **GPIO6-11**, and on this
+frontend every one of those is already spoken for: GPIO6 is the C5 handshake line, 7/8 are the
+touch/codec I2C, and 9-13 are audio I2S. So the plate cannot use SPI2's default pads -- it must
+route SPI2 through the **GPIO matrix** onto the free block (20-38, 47-52).
+
+That is fine at the 10 MHz this bus runs: matrix routing is a crossbar, and the dedicated pads
+only matter at the tens-of-MHz rates the counters never need. It does mean the pin choice is
+free rather than dictated by the IO MUX, which is why the allocation above is a proposal rather
+than a constraint.
+
 ## 4. Frontend-backend transport
 
 **UART replaces USB.** This is the change the stack enables.
