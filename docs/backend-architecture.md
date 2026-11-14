@@ -218,7 +218,49 @@ module rather than across a connector, and why the wiring discipline above is no
 The Zigbee case needs no backend board: the C5 has IEEE 802.15.4 in hardware and esp_hosted
 ships an `openthread` example, so it is the same frontend plus firmware.
 
-## 9. Next steps
+## 9. Power input and 24 V scales
+
+No LDOs: every rail comes from a buck, matching the WROOM plate's pattern (5 V -> 3.3 V, AP63203
+class). The quadrature plate therefore carries its own regulator and does not depend on the dev
+board's 3.3 V pin.
+
+### The 24 V question splits into three unrelated problems
+
+They get conflated, and only one of them is actually expensive:
+
+| Requirement | Cost | Verdict |
+|---|---|---|
+| **(a) Power the stack from 24 V** | one wide-Vin buck, or none | **do it** |
+| **(b) Supply 24 V to the scales** | a fuse and a header, if (a) is done | **nearly free** |
+| **(c) Accept 24 V *signal* levels** | per-channel conditioning, 10-15 channels | defer, but make room in copper |
+
+**(a) is close to free** because the AP6320x family is a 32 V-rated part: the same regulator the
+WROOM plate already uses will take 24 V in. Making the plate 24 V-capable is a fuse, a TVS and a
+35 V input capacitor -- and it is a product win, because an industrial cabinet has 24 V, not a USB
+socket. Cascade: 24 V -> 5 V (AP63205-class wide-Vin) -> 3.3 V (AP63203-class), so the 5 V rail
+that goes up J2 to the frontend is still 5 V.
+
+**(b) needs no boost converter.** With 24 V present, a fused (ideally current-limited) pass-through
+powers 24 V scales directly. Boosting 5 V to 24 V for this would be wasteful, add a rail and add
+EMI: reject it. Size the pass-through for the real load -- five scales at ~150 mA each is 750 mA at
+24 V -- including the ground return.
+
+**(c) is the only real work, and it can wait.** A 74LVC245 cannot see 24 V (absolute maximum ~5.5 V),
+so each channel needs a series resistor, a divider, a clamp and hysteresis. Ten channels for five
+axes (A and B), up to fifteen with index. Practical receiver: ~4.7k/1.2k divider (keep the source
+impedance low -- a 100k/10k divider with 100 pF is too slow for 200 kHz scales), BAT54S clamp,
+74HC14 or 74LVC1G17 for clean edges, plus a TVS on the connector side.
+
+Recommendation: **option in copper, decide in BOM.** Lay the input stage out so the same board
+supports both variants -- 0 ohm link into the LVC245 for 5 V TTL, or the divider/clamp/Schmitt
+network populated and the link omitted for 24 V. Then 24 V support costs a BOM line and no respin,
+and the 5 V product can ship first.
+
+One open question for (c): are the 24 V scales **single-ended** (one wire per signal) or
+**differential** (A/A-bar, B/B-bar)? Differential doubles the channel count and changes the DB9
+pinout, and needs a receiver rather than a divider.
+
+## 10. Next steps
 
 1. **Measure** the frontend's actual 5 V current at full backlight -- turns §6 from estimate
    into a number before the plate's power section is committed.
