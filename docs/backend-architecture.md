@@ -80,7 +80,7 @@ design.
 |---|---|---|
 | DRO / ELS (stacked) | **UART on the stack bus** | no cable, no USB host/device stack, bounded latency |
 | Existing USB backends | USB HID | unchanged; `esp32p4_usb_dro_backend` already does this |
-| Plain DRO (WROOM plate) | USB-UART via the CH340C bridge | that plate has no USB OTG at all |
+| Plain DRO (WROOM plate) | **UART2 header -> J2**, four wires | the board exposes UART2, so no USB and no CH340 at runtime |
 
 For the CH340C path the frontend needs a serial-class host driver -- `espressif/usb_host_ch34x_vcp`
 2.2.x is available, with `espressif/usb_host_cdc_acm` 2.4.x as the generic fallback if the
@@ -246,7 +246,7 @@ the Guition frontend -- the existing rev-family switch covers it with no new mec
 | Product | Frontend | Plate |
 |---|---|---|
 | DRO / ELS | osptek P4C5 dev board | M5Stamp + 5x LS7366R + power |
-| Plain DRO | osptek P4C5 dev board | existing WROOM scale plate |
+| Plain DRO | osptek P4C5 dev board | existing WROOM scale plate, 4-wire UART to J2 |
 | Zigbee coordinator / LAN bridge | osptek P4C5 dev board | none, or the PoE-Ethernet adapter |
 
 The Zigbee case needs no backend board: the C5 has IEEE 802.15.4 in hardware and esp_hosted

@@ -132,8 +132,36 @@ silently shift a field.
 | Transport | Framing | Integrity | Rate |
 |---|---|---|---|
 | USB HID (existing backends) | report ID | USB CRC | up to 1 kHz |
-| UART on the stack bus | `0xA5 len seq t16 payload crc16` | CRC-16 | 250 Hz-1 kHz |
-| CDC via CH340C (WROOM plate) | same frame | CRC-16 | 200 Hz |
+| **UART, both backends** | `0xA5 len seq t16 payload crc16` | CRC-16 | 250 Hz-1 kHz |
+| CDC via CH340C | same frame | CRC-16 | **programming only** -- see below |
+
+### UART is the runtime transport for both backends
+
+The WROOM plate exposes **UART2 on a header**, so the plain-DRO product does not need the CH340C
+at runtime at all: four wires from that header to J2, and the frontend sees the same UART
+transport as the ELS plate.
+
+| Wire | WROOM header | J2 pin | Frontend signal |
+|---|---|---|---|
+| WROOM UART2 TX | TXD2 | 21 | `BB_UART_RX` (GPIO36) |
+| WROOM UART2 RX | RXD2 | 19 | `BB_UART_TX` (GPIO38) |
+| Ground | GND | 3 or 4 | GND |
+| 5 V (optional) | 5 V | 1 or 2 | VIN_5V |
+
+TX and RX **cross**: the backend's TX lands on the frontend's RX. Keeping UART0 for the console
+is what makes this pleasant -- you debug the WROOM over USB as usual while the protocol runs on
+UART2.
+
+Consequences:
+
+- the frontend needs **no CH34x driver** for the DRO products; the CDC path remains only for
+  standalone/programming use of the WROOM board;
+- 1 Mbaud is the shared default, but the CH340C's 2 Mbaud limit no longer constrains anything, so
+  a faster rate is available if a future plate wants it;
+- the WROOM board can be **powered from J2** (5 V, ~0.2 A), removing a second supply brick -- as
+  long as its USB-C is not also plugged in, which would back-feed one source into the other.
+  Series resistors (100-330 ohm) on TX/RX are worth adding if the four-wire link ever leaves the
+  enclosure.
 
 The payload is identical in all three, so the parser is written once and the transport supplies
 or strips the frame.
