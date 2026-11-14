@@ -192,6 +192,24 @@ Still to confirm before layout:
    prototype plate practical. Get the number of castellated/DIP pins and their arrangement from
    the ESP32-P4NRW32 datasheet before drawing the footprint.
 
+### Module selection filter
+
+The counter SPI is the plate's core function, so it is the first filter any candidate module
+must pass -- cheaper modules have already failed it.
+
+1. **A full SPI2 must be free.** On the P4, SPI0/SPI1 are bonded to the in-package flash and
+   PSRAM; only SPI2 is general-purpose through the GPIO matrix. A module optimised for displays
+   tends to expose the MIPI lanes plus a few control pins, and not enough free GPIOs to give
+   SPI2 a clock, two data lines and **five chip selects**.
+2. **>=20 free GPIOs**, of which 8 are SPI2-capable (3 signals + 5 CS), plus 2 UART, IRQ,
+   reset, boot and 3 step/dir.
+3. **P4-only**, no radio co-processor: the frontend already has one.
+4. **Socketable**, 2.54 mm preferred -- a socketed first prototype is worth more than a cheaper
+   module that must be reflowed to be evaluated.
+
+A candidate was rejected on point 1 during the design: it exposed plenty of pins, but not the
+eight SPI2-capable ones the plate needs.
+
 **Fallback: osptek ESP32-P4-Core** -- P4-only (no radio), 88-pin stamp, 16 MB flash / 32 MB
 PSRAM, 360 MHz (rev v1.x), fully documented, and its pin definition is already mirrored in this
 project. Larger, so the plate becomes full-size, but its specs are not in question. Note it is
