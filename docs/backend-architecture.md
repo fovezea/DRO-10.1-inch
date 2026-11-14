@@ -207,6 +207,22 @@ must pass -- cheaper modules have already failed it.
 4. **Socketable**, 2.54 mm preferred -- a socketed first prototype is worth more than a cheaper
    module that must be reflowed to be evaluated.
 
+### Chip capability is not the constraint
+
+From the ESP32-P4 (QFN104) pin layout, for the record:
+
+- **55 GPIOs**, GPIO0-54, and **SPI2 routes to any of them** through the GPIO matrix. The filter
+  above is therefore about what a *module* breaks out, never about what the chip can do.
+- **MIPI DSI/CSI (34-48), USB DM/DP (49/50) and the FLASH_* group (27-33) are dedicated pads**,
+  so they do not consume GPIOs. That is why a display-oriented module can look pin-rich and
+  still be SPI-poor: it is a breakout choice, not silicon.
+- **The chip needs a dozen rails** -- VDD_DCDC/FB_DCDC/EN_DCDC, VDD_HP_0-3, VDD_IO_0-6, VDD_LP,
+  VDD_ANA, VDD_LDO, VDD_PSRAM_0/1, VDDO_PSRAM, VDDO_FLASH, VDD_MIPI_DPHY, VDD_USBPHY, VDD_BAT.
+  A bare QFN104 is not hand-assembly, which is exactly why the plate sockets a module.
+
+What remains to check is the module's own pin list: whether it exposes >=20 of those GPIOs,
+including the eight SPI2-capable ones the counters need.
+
 A candidate was rejected on point 1 during the design: it exposed plenty of pins, but not the
 eight SPI2-capable ones the plate needs.
 
