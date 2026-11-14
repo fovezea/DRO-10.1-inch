@@ -10,7 +10,7 @@ Status: design record, no code yet. Two backend products behind one frontend.
 | MCU | ESP32-WROOM-32E (existing plate) | ESP32-P4 stamp, **single CPU** |
 | Counters | 8x PCNT (16-bit, unwrap needed) | 5x **LS7366R** (32-bit, x4 quadrature, index) |
 | Step outputs | none | 3x step/dir (RMT/MCPWM) |
-| USB to frontend | **CH340C UART bridge** (see §5) | native USB OTG, HID |
+| USB to frontend | CH340C bridge, or UART when stacked (see §5) | UART on the stack bus, no USB (see §5) |
 | Status | plate under construction, kept as the cheap path | to be designed |
 
 Not every installation needs electronic gearing: a plain DRO is cheaper, and the WROOM plate
@@ -71,26 +71,30 @@ The remaining 200 us is headroom for USB HID servicing (frontend traffic), which
 low-priority and interrupt-driven. If a tick overruns, the design degrades to a longer tick
 (slightly coarser gearing), never to lost counts -- because positions are absolute.
 
-## 5. The transport differs, and that is a protocol decision
+## 5. Transport: one protocol, three carriers
 
-This is the only thing that does **not** come for free from the two-board split:
+The stacked products need no USB at all, which removes the most complicated part of the old
+design.
 
-- **ELS plate**: native USB -> HID, exactly what `esp32p4_usb_dro_backend` does today. No change.
-- **DRO-lite**: the WROOM has **no USB OTG**. Its USB is a CH340C bridge, so the frontend sees
-  a USB-UART, not a HID device. That means the frontend needs a second USB class (confirmed available as
-  `espressif/usb_host_ch34x_vcp` 2.2.x, with `espressif/usb_host_cdc_acm` 2.4.x as the
-  generic fallback if the bridge is ever swapped) and
-  the *same application framing carried over CDC*.
+| Product | Transport | Why |
+|---|---|---|
+| DRO / ELS (stacked) | **UART on the stack bus** | no cable, no USB host/device stack, bounded latency |
+| Existing USB backends | USB HID | unchanged; `esp32p4_usb_dro_backend` already does this |
+| Plain DRO (WROOM plate) | USB-UART via the CH340C bridge | that plate has no USB OTG at all |
 
-Decision: keep **one application protocol** (fixed-size frames, sequence + tick + 8 x 32-bit
-positions + status + CRC) and let the USB class be a transport detail. The backend reports its
-capabilities in the handshake -- number of axes, ELS present or not -- and the frontend enables
-or hides the gearing UI accordingly. That way a DRO-lite installation never sees dead ELS
-controls, and the frontend stays one codebase.
+For the CH340C path the frontend needs a serial-class host driver -- `espressif/usb_host_ch34x_vcp`
+2.2.x is available, with `espressif/usb_host_cdc_acm` 2.4.x as the generic fallback if the
+bridge chip is ever swapped.
 
-Bandwidth check for DRO-lite: 32-byte frames at 1 kHz over 1-2 Mbaud CH340C is ~160-320 us of
-UART per frame, so 1 kHz is feasible but not generous. Plain DRO does not need 4 kHz; 200 Hz
-is plenty for a readout, which leaves plenty of margin.
+Decision: keep **one application protocol** -- fixed-size frames, sequence + tick + 5 x 32-bit
+positions + status + CRC -- and treat the carrier as a detail. The backend reports its
+capabilities in the handshake (number of axes, ELS present or not) and the frontend enables or
+hides the gearing UI accordingly, so no installation shows dead controls and the frontend stays
+one codebase.
+
+Bandwidth: 32-byte frames at 250 Hz need ~8 kB/s, which is nothing for a 1 Mbaud UART. Even the
+CH340C path at 1-2 Mbaud sustains 1 kHz, so the transport never becomes the bottleneck -- the
+250 us tick on the backend does.
 
 ## 6. Power
 
@@ -133,7 +137,73 @@ If the frontend's own USB-C is also plugged in (normal during development, for f
 is two sources on one rail: feed it data-only, or put an ideal-diode OR on the frontend, or the
 plate back-feeds the host.
 
-## 7. Next steps
+## 7. Stacking platform
+
+The frontend breaks every GPIO out on 2x2x17 side headers, so a plate sits directly on its back
+with no cables. The stack is **two levels**: frontend on top, one backend plate below carrying
+the P4, the five LS7366Rs and the 5 V input. Counters and P4 share that plate precisely so the
+10 MHz SPI never crosses a connector -- the reason a three-level stack was rejected.
+
+```
+[ frontend P4C5 ]        panel, touch, audio, TF, Wi-Fi
+      || headers: UART + IRQ + reset + boot + 5V/GND
+[ backend plate ]        M5Stamp + 5x LS7366R + DB9s + 5V input
+                         (+ SPI between P4 and counters, on-board)
+```
+
+Consequences:
+
+- **The bus carries no high-speed signals** -- five control lines plus power, so 2.54 mm headers
+  are entirely adequate and the interface cannot become an EMI problem.
+- **Power flows upward** from the bottom plate: it is the source, the frontend is a sink of
+  ~0.7 A. At ~1.2 A total, 3-4 pins per rail with a wide pour is ample.
+- **A plate may bring bulk connectors instead of stacking under them.** The PoE-Ethernet adapter
+  occupies the slot rather than having a board above it, so the LAN bridge is *PoE plate instead
+  of backend plate*, not both.
+- **The same bus serves other products**: Zigbee coordinator and LAN bridge reuse the frontend
+  with no or different plates. See `docs/stack-bus.md` for the pin contract.
+
+## 8. Backend MCU module
+
+The backend plate is small -- it sits behind a 72x52 mm dev board and carries the counters,
+their buffers, five DB9s and a 5 V input. A full-size 88-pin stamp would turn it into a second
+full board, so the module is chosen for compactness, not pin count.
+
+**Chosen: M5Stamp ESP32P4** (M5Stack S013, also at DigiKey and The Pi Hut). P4-only, so no radio
+the product does not need, and small enough to sit beside five LS7366R on one plate.
+
+Five things to confirm on the exact variant before the footprint is drawn:
+
+1. **P4 revision** -- v1.x (360 MHz) or v3.x (400 MHz). Decides the backend firmware family and
+   is not changeable later without a different module.
+2. **Free GPIOs** -- ~20 needed: 3 SPI, 5 CS, 2 UART, IRQ, reset, boot, 3 step/dir.
+3. **PSRAM / flash** -- enough for ELS math and buffers; the P4-Core's 16 MB / 32 MB is the
+   yardstick.
+4. **5 V in and 3.3 V out** -- the plate needs its own 3.3 V rail for the LS7366Rs, so either
+   the module supplies it or the plate's regulator feeds both.
+5. **Footprint and pitch** -- castellated; socket it rather than soldering if possible.
+
+**Fallback: osptek ESP32-P4-Core** -- P4-only (no radio), 88-pin stamp, 16 MB flash / 32 MB
+PSRAM, 360 MHz (rev v1.x), fully documented. Larger, so the plate becomes full-size, but its
+specs are not in question. Note it is not footprint-compatible with the frontend's P4C5 stamp:
+the same physical positions are the C5's UART on one module and LDO enables on the other.
+
+> **Revision is the purchasing constraint.** ESP32-P4 ships as v1.x (360 MHz, shield unmarked)
+> and v3.x (400 MHz, shield marked "X"); firmware for one refuses to run on the other. Pick one
+> and buy stock.
+
+### Product line-up
+
+| Product | Frontend | Plate |
+|---|---|---|
+| DRO / ELS | osptek P4C5 dev board | M5Stamp + 5x LS7366R + power |
+| Plain DRO | osptek P4C5 dev board | existing WROOM scale plate |
+| Zigbee coordinator / LAN bridge | osptek P4C5 dev board | none, or the PoE-Ethernet adapter |
+
+The Zigbee case needs no backend board: the C5 has IEEE 802.15.4 in hardware and esp_hosted
+ships an `openthread` example, so it is the same frontend plus firmware.
+
+## 9. Next steps
 
 1. **Measure** the frontend's actual 5 V current at full backlight -- turns §6 from estimate
    into a number before the plate's power section is committed.

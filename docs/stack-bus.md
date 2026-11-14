@@ -4,13 +4,21 @@ The frontend breaks every GPIO out on its 2x2x17 headers, so a plate can sit on 
 cables. This document is the **contract**: which pins the frontend already owns, which are free,
 what each bus is for, and the rules a plate design must follow.
 
-Two consequences worth stating up front:
+**The stack is two levels: frontend plus one plate.** The plate carries the backend P4 *and*
+the quadrature receivers on the same board, which keeps the 10 MHz counter SPI entirely on that
+plate -- it never crosses a connector. Splitting them onto two plates was considered and
+rejected for exactly that reason.
+
+Three consequences worth stating up front:
 
 1. **USB between frontend and backend disappears.** The link becomes a 2-wire UART on the
    stack bus. No USB host stack on the frontend, no HID/CDC class, no CH340/VCP driver, no
    cable. USB on the frontend stays for flashing only.
-2. **There are two buses, not one.** The frontend-to-backend control channel and the
-   backend-to-counter SPI are different things and must not be mixed.
+2. **The bus therefore carries no high-speed signals.** Only the control UART, a few handshake
+   lines and power -- which is why 2.54 mm headers are perfectly adequate here.
+3. **The counter SPI is a plate-internal bus.** It appears in this document only as a reserved
+   pin block for the variant where the counters get their own plate; if that never happens,
+   those pins stay free.
 
 ## 1. What the frontend already owns
 
@@ -41,28 +49,31 @@ That is roughly **25 usable signals**, against a need of about 20 for a three-le
 
 ## 3. Proposed allocation
 
-Three levels: frontend (top) / backend P4 plate (middle) / quadrature + power (bottom).
-The bus carries the frontend-backend link *and* the backend-counter SPIs, because those two
-plates are separate.
+Two levels: frontend (top) and one backend plate (bottom) carrying P4 + 5x LS7366R + power
+input. The bus is small:
 
 | Signal | GPIO (frontend side) | Direction | Notes |
 |---|---|---|---|
-| `BB_UART_TX` | 20 | frontend -> backend | link to the backend MCU, UART1 or UART2 |
+| `BB_UART_TX` | 20 | frontend -> backend | UART1 or UART2, 1 Mbaud is ample |
 | `BB_UART_RX` | 21 | backend -> frontend | |
 | `BB_IRQ` | 22 | backend -> frontend | optional; line-rate events, otherwise polled |
 | `BB_RESET` | 23 | frontend -> backend | lets the frontend recover a wedged backend |
-| `BB_BOOT` | 24 | frontend -> backend | optional: enter backend download mode without a button |
-| `SPI_SCK` | 25 | backend -> counters | ~10 MHz is ample (25 us for a 5-counter read) |
-| `SPI_MOSI` | 26 | backend -> counters | |
-| `SPI_MISO` | 27 | counters -> backend | |
-| `CS0..CS4` | 28-32 | backend -> counters | one per LS7366R |
-| `CNT_DRDY` | 33 | counters -> backend | optional; otherwise polled |
-| `CNT_RESET` | 34 | backend -> counters | optional |
-| spare | 35-38, 47-52 | -- | leave for the next plate (PoE, radio) |
+| `BB_BOOT` | 24 | frontend -> backend | optional: backend download mode without a button |
+| spare | 25-38, 47-52 | -- | reserved for the next plate (PoE, radio, split counters) |
 
-If the backend and quadrature sections end up on **one** plate, the SPI block leaves the bus
-entirely and the bus shrinks to the six `BB_*` signals plus power -- which is what the two-level
-variant looks like.
+That is **five signals** against ~25 free pins: the bus is dominated by power, not by signals,
+and the mechanical footprint is set by the headers rather than by routing.
+
+### Variant: counters on their own plate
+
+If the quadrature receivers ever move to a separate plate (more axes, isolation, a different
+scale standard), these become the bus signals -- reserved now so that plate stays possible:
+
+| Signal | GPIO | Notes |
+|---|---|---|
+| `SPI_SCK` / `MOSI` / `MISO` | 25 / 26 / 27 | 10 MHz, interleave GND between them |
+| `CS0..CS4` | 28-32 | one per LS7366R |
+| `CNT_DRDY` / `CNT_RESET` | 33 / 34 | optional |
 
 ### Power pins
 
