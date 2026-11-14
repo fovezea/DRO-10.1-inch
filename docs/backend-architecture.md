@@ -224,6 +224,50 @@ No LDOs: every rail comes from a buck, matching the WROOM plate's pattern (5 V -
 class). The quadrature plate therefore carries its own regulator and is independent of the dev
 board's 3.3 V pin -- it can be powered and tested on its own.
 
+### AC input: provision for 220 V -> 5 V / 3 A
+
+The quadrature plate is the natural place for the mains supply: it already carries the power
+input and the machine-side connectors, and it is the board furthest from the frontend's panel
+electronics.
+
+**Provision, not population.** Lay out the footprint, the isolation slot and the protection for a
+15 W class AC-DC module, and leave it unpopulated by default so the board can be built and tested
+as a 5 V-input plate first:
+
+| Item | Choice | Notes |
+|---|---|---|
+| AC-DC module | 15 W class, 5 V / 3 A: Mean Well IRM-20-5, Recom RAC20-05SK, Hi-Link HLK-20M05 | footprint varies by vendor -- pick the part before the layout, not after |
+| Fuse | on L, ~1 A time-lag | before anything else on the mains side |
+| MOV | across L-N | 275 VAC class |
+| X2 capacitor | across L-N | EMI, not optional on a mains input |
+| Isolation slot | routed under the module | keeps creepage/clearance honest |
+| Bulk on 5 V | 220-470 uF + 100 nF | the buck's input and the module's stability |
+
+Placement matters as much as the footprint:
+
+- **Put it at the plate edge**, away from the P4 and the 3.3 V buck. A 15 W module is 18-25 mm tall
+  -- unavoidable at this power level -- so let it overhang the edge rather than sit under the dev
+  board. The DB9s are already the tallest parts there, so the visual height is set anyway.
+- **Mains stays on one end of the board.** Short L/N traces, one layer only, no via crossings, and
+  nothing running underneath. The isolation slot goes under the module, not around the whole plate.
+- **Silkscreen warning** on the mains end, and the 5 V/3 V3 side kept physically separate.
+
+Sizing: steady state is ~1.2 A and the peak ~1.8 A, so 3 A is headroom rather than need -- which is
+exactly what you want if this plate ends up powering the frontend as well as the backend.
+
+### 3.3 V from 5 V: an IC, not a brick
+
+Pre-made 3.3 V DC/DC bricks are tall and unnecessary at this current. The load here is five
+LS7366Rs plus five 74LVC245s, roughly 30-50 mA, so:
+
+**AP63203-class synchronous buck in TSOT-26**, 4.7 uH inductor, 2x 22 uF -- about **1.5 mm** of
+height, and the same part the WROOM plate already uses. That gives parts commonality with the
+existing backend and keeps the stacked assembly low, which is the whole reason the plate is
+soldered rather than socketed.
+
+If both the AC module and a bench 5 V supply can ever be present, OR them with a diode (or an ideal
+diode) rather than trusting the operator not to plug both.
+
 ### Scales are 5 V TTL only
 
 **24 V scales are out of scope.** They would have needed per-channel conditioning (a 74LVC245
