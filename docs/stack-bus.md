@@ -39,30 +39,75 @@ Fixed by the frontend's own peripherals; a plate must treat these as reserved.
 
 Also unavailable by nature: the DSI and CSI lanes, USB DM/DP, and the flash/PSRAM pads.
 
-## 2. Free for the bus
+## 2. The J2 header, as drawn
 
-`20-38` and `47-52` are the safe block: not used by any frontend peripheral, and clear of the
-strapping and JTAG pads. `1` and `46` are free but are strapping-sensitive, keep them as last
-resort.
+`J2` is a 2x17 header at 2.54 mm and it alone carries GPIO24-53 -- enough for the entire bus on
+one connector, which is why the allocation below uses J2 only and leaves J4 for the C5 side.
 
-That is roughly **25 usable signals**, against a need of about 20 for a three-level stack.
+Left column is odd pins, right column even, both descending:
+
+| Pin | Signal | Pin | Signal |
+|---|---|---|---|
+| 1 | GND | 2 | VIN_5V |
+| 3 | VIN_5V (verify) | 4 | GND |
+| 5 | GPIO52 | 6 | GPIO53 |
+| 7 | GPIO50 | 8 | GPIO51 |
+| 9 | GPIO48 | 10 | GPIO49 |
+| 11 | GPIO46 | 12 | GPIO47 |
+| 13 | GPIO44 | 14 | GPIO45 |
+| 15 | GPIO42 | 16 | GPIO43 |
+| 17 | GPIO40 | 18 | GPIO41 |
+| 19 | GPIO38 | 20 | GPIO39 |
+| 21 | GPIO36 | 22 | GPIO37 |
+| 23 | GPIO34 | 24 | GPIO35 |
+| 25 | GPIO32 | 26 | GPIO33 |
+| 27 | GPIO30 | 28 | GPIO31 |
+| 29 | GPIO28 | 30 | GPIO29 |
+| 31 | GPIO26 | 32 | GPIO27 |
+| 33 | GPIO24 | 34 | GPIO25 |
+
+Two 5 V pins and two GND per header. At ~1.2 A total that is ~0.6 A per pin, well inside a
+2.54 mm header pin's rating -- and using both headers' 5 V pins gives the four the power section
+assumed.
+
+**Not usable by a plate**, on this header, because the frontend already drives them:
+
+| GPIO | J2 pins | Frontend use |
+|---|---|---|
+| 39-44 | 20, 17, 18, 15, 16, 13 | TF card (SD1 D0-D3, CLK, CMD) |
+| 45 | 14 | TF card detect |
+| 53 | 6 | NS4150B power-amp enable |
+| 46, 47 | 11, 12 | unused by the frontend, but confirmed occupied/unknown -- verify before claiming |
+
+**Free and usable: 24-38** (J2 pins 33, 31, 29, 27, 25, 23, 21, 19, 22, 24, 26, 28, 30, 32,
+34) -- fifteen pins, exactly what the bus needs -- plus **48-52** (pins 9, 7, 8, 5, 10) as spares
+for later plates.
 
 ## 3. Proposed allocation
 
-Two levels: frontend (top) and one backend plate (bottom) carrying P4 + 5x LS7366R + power
-input. The bus is small:
+All on J2, so the plate mates with one header; J4 stays untouched for the C5 side.
 
-| Signal | GPIO (frontend side) | Direction | Notes |
+| Signal | GPIO | J2 pin | Direction |
 |---|---|---|---|
-| `BB_UART_TX` | 20 | frontend -> backend | UART1 or UART2, 1 Mbaud is ample |
-| `BB_UART_RX` | 21 | backend -> frontend | |
-| `BB_IRQ` | 22 | backend -> frontend | optional; line-rate events, otherwise polled |
-| `BB_RESET` | 23 | frontend -> backend | lets the frontend recover a wedged backend |
-| `BB_BOOT` | 24 | frontend -> backend | optional: backend download mode without a button |
-| spare | 25-38, 47-52 | -- | reserved for the next plate (PoE, radio, split counters) |
+| `BB_UART_TX` | 38 | 19 | frontend -> backend |
+| `BB_UART_RX` | 36 | 21 | backend -> frontend |
+| `BB_IRQ` | 37 | 22 | backend -> frontend, optional |
+| `BB_RESET` | 34 | 23 | frontend -> backend |
+| `BB_BOOT` | 35 | 24 | frontend -> backend, optional |
+| `SPI_SCK` | 32 | 25 | backend -> counters |
+| `SPI_MOSI` | 33 | 26 | backend -> counters |
+| `SPI_MISO` | 30 | 27 | counters -> backend |
+| `CS0` | 31 | 28 | backend -> counter 0 |
+| `CS1` | 28 | 29 | backend -> counter 1 |
+| `CS2` | 29 | 30 | backend -> counter 2 |
+| `CS3` | 26 | 31 | backend -> counter 3 |
+| `CS4` | 27 | 32 | backend -> counter 4 |
+| spare | 24 | 33 | |
+| spare | 25 | 34 | |
+| spare | 48-52 | 9, 7, 8, 5, 10 | for a future plate |
 
-That is **five signals** against ~25 free pins: the bus is dominated by power, not by signals,
-and the mechanical footprint is set by the headers rather than by routing.
+The interleaving is deliberate: `CS0..CS4` land on adjacent pins (28-32) so the ribbon to the
+counter chips runs as one bundle, and the UART/RESET group sits next to them at 19-24.
 
 ### Variant: counters on their own plate
 
@@ -146,10 +191,18 @@ is 160-320 us of UART per frame -- feasible but not generous. A readout does not
 5. **One plate, one purpose.** A plate that brings its own bulk connectors (the PoE adapter)
    occupies the slot rather than having another board stacked above it.
 
-## 6. Open item before drawing anything
+## 6. What still needs verifying
 
-The table above assigns **functions to GPIO numbers**, which is the part that has to be agreed.
-The final step is mapping those GPIOs to **physical header positions** (which pin of J2/J4 on
-the dev board carries GPIO25, etc.) -- that mapping lives in the baseboard schematic, not in the
-vendor README, so it must be read off the drawing pin by pin before the plate's footprint is
-laid out. Getting the function list right first is what keeps that mechanical step short.
+The J2 mapping above came from the vendor's own header drawing, so the plate footprint can be
+laid out against it. Three small things remain, all checkable on the bench in minutes:
+
+1. **Pins 1-4 on J2**: the drawing shows two 5 V and two GND, but the left pair (1, 3) is not
+   labelled unambiguously -- confirm which is which with a meter before committing the footprint's
+   power pins. Getting this backwards is a short, not a nuisance.
+2. **GPIO46/47 (J2 pins 11, 12)**: not used by this frontend, but not confirmed free either. They
+   are held in reserve rather than assigned.
+3. **GPIO48-52 (J2 pins 9, 7, 8, 5, 10)**: treated as spare. Confirm they are truly unconnected
+   on the dev board before relying on them for a future plate.
+
+Nothing else is blocking: module, counters, bus functions, power topology and transport are all
+decided and recorded.
