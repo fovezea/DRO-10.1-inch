@@ -165,81 +165,47 @@ Consequences:
 
 ## 8. Backend MCU module
 
-The backend plate is small -- it sits behind a 72x52 mm dev board and carries the counters,
-their buffers, five DB9s and a 5 V input. A full-size 88-pin stamp would turn it into a second
-full board, so the module is chosen for compactness, not pin count.
+**Chosen: osptek ESP32-P4-Core** -- the same module family as the frontend, P4-only, 88-pin stamp,
+16 MB flash / 32 MB PSRAM, 360 MHz (P4 rev v1.x).
 
-**Chosen: M5Stamp ESP32P4**, built on the Espressif **ESP32-P4NRW32** module. P4-only, so no
-radio the product does not need, and compact enough to sit beside five LS7366R on one plate.
+The deciding argument is **one board type across the design**: the frontend already uses an
+osptek module, so using the same part in the backend means one supplier, one datasheet, one pin
+definition and a spare on the shelf. The M5Stamp was considered and dropped for that reason --
+it is a different vendor, a different pinout and a different mounting scheme for no functional
+gain, since both are P4-only and both are rev v1.x.
 
-Confirmed from the vendor's own product data:
+### Mounting: soldered to the backplane, not socketed
 
-| Item | Value | Consequence |
+The module is soldered directly to the plate (wires through the plate's holes to the module
+pads) rather than socketed. That is the right call for the SPI: with the module and the five
+LS7366Rs on the same board, the counter bus runs are centimetres, which is where a 10 MHz bus is
+easy.
+
+Conditions that make direct soldering safe:
+
+1. **Wire only the ~20 signals the plate needs** (13 bus signals, power, ground, plus the SPI and
+   three step/dir), not all 88 pads. This is the difference between a 30-joint job and a 176-joint
+   one at ~1.27 mm pitch.
+2. **Solder the module's ground pads to copper.** The P4 draws a few hundred milliamps and
+   dissipates 1-2 W; a single thin ground return gives both ground bounce on the SPI and a hot
+   module.
+3. **Bulk decoupling on the plate at the wire entries**, not just on the module.
+4. Keep the SPI runs <=10 cm, each with a ground return, 33-100 ohm series resistors on SCK and
+   the CS lines, and away from the buck's switching node and the DB9 harness.
+
+### Why the SPI clock cannot be low
+
+A counter read is 5 bytes (instruction + 4 data) per chip, 25 bytes for five chips, every 250 us:
+
+| Clock | Per tick | Share of tick |
 |---|---|---|
-| Module | ESP32-P4NRW32 | Espressif module, so its datasheet is authoritative |
-| Clock | 360 MHz + 40 MHz LP core | **P4 rev v1.x** |
-| Memory | 16 MB flash + 32 MB PSRAM | matches the osptek P4-Core |
-| Package | **SMT and DIP** (castellated + 2.54 mm) | the first plate can be **socketed**, not reflowed |
-| Multimedia | MIPI CSI/DSI broken out | so GPIO breakout is not a concern -- it exposes far more than the ~20 needed |
+| 1 MHz | 200 us | 80 %, unusable |
+| 2 MHz | 100 us | 40 %, too tight |
+| **5 MHz** | **40 us** | **16 %, fine** |
+| **10 MHz** | **20 us** | **8 %, comfortable** |
 
-Still to confirm before layout:
-
-1. **Supply.** P4 modules are 3.3 V; the plate then needs its own 5 V -> 3.3 V buck feeding both
-   the module and the five LS7366Rs. Confirm whether the module expects 3.3 V only, and whether
-   the MIPI PHY rails (2.8 V / 1.8 V) are required when MIPI is unused -- for a backend with no
-   display they should be tie-off-able, as on the osptek P4-Core.
-2. **Pin count and pitch.** "SMT/DIP" means it can be socketed, which is what makes a first
-   prototype plate practical. Get the number of castellated/DIP pins and their arrangement from
-   the ESP32-P4NRW32 datasheet before drawing the footprint.
-
-### Module selection filter
-
-The counter SPI is the plate's core function, so it is the first filter any candidate module
-must pass -- cheaper modules have already failed it.
-
-1. **>=20 free GPIOs.** SPI2 needs no dedicated pads: the ESP32-P4 IO MUX lists dedicated
-   `SPI2_CK/D/Q/CS` on GPIO6-11 only as the default alias (F3), and the GPIO matrix routes SPI2
-   to *any* GPIO. At the 10 MHz this plate runs, matrix routing is more than adequate. So a
-   module is judged on how many free GPIOs it exposes, not on whether it happens to name them
-   SPI2.
-2. **Eight of those for the counter bus** (3 signals + 5 CS), plus 2 UART, IRQ, reset, boot and
-   3 step/dir.
-3. **P4-only**, no radio co-processor: the frontend already has one.
-   (GPIO2-5 default to MTCK/MTDI/MTMS/MTDO, so using them as GPIO costs JTAG debug -- acceptable
-   on a plate, but not the first choice.)
-4. **Socketable**, 2.54 mm preferred -- a socketed first prototype is worth more than a cheaper
-   module that must be reflowed to be evaluated.
-
-### Chip capability is not the constraint
-
-From the ESP32-P4 (QFN104) pin layout, for the record:
-
-- **55 GPIOs**, GPIO0-54, and **SPI2 routes to any of them** through the GPIO matrix. The filter
-  above is therefore about what a *module* breaks out, never about what the chip can do.
-- **MIPI DSI/CSI (34-48), USB DM/DP (49/50) and the FLASH_* group (27-33) are dedicated pads**,
-  so they do not consume GPIOs. That is why a display-oriented module can look pin-rich and
-  still be SPI-poor: it is a breakout choice, not silicon.
-- **The chip needs a dozen rails** -- VDD_DCDC/FB_DCDC/EN_DCDC, VDD_HP_0-3, VDD_IO_0-6, VDD_LP,
-  VDD_ANA, VDD_LDO, VDD_PSRAM_0/1, VDDO_PSRAM, VDDO_FLASH, VDD_MIPI_DPHY, VDD_USBPHY, VDD_BAT.
-  A bare QFN104 is not hand-assembly, which is exactly why the plate sockets a module.
-
-What remains to check is the module's own pin list: whether it exposes >=20 of those GPIOs,
-including the eight SPI2-capable ones the counters need.
-
-A candidate was rejected on point 1 during the design: it exposed plenty of pins, but not the
-eight SPI2-capable ones the plate needs.
-
-**Fallback: osptek ESP32-P4-Core** -- P4-only (no radio), 88-pin stamp, 16 MB flash / 32 MB
-PSRAM, 360 MHz (rev v1.x), fully documented, and its pin definition is already mirrored in this
-project. Larger, so the plate becomes full-size, but its specs are not in question. Note it is
-not footprint-compatible with the frontend's P4C5 stamp: the same physical positions are the
-C5's UART on one module and LDO enables on the other.
-
-Because both candidates are rev v1.x, the backend firmware sits in the same revision family as
-the Guition frontend -- the existing rev-family switch covers it with no new mechanism.
-
-> **Revision is the purchasing constraint.** ESP32-P4 ships as v1.x (360 MHz, shield unmarked)
-> and v3.x (400 MHz, shield marked "X"); firmware for one refuses to run on the other.
+So this is a 5-10 MHz design. That is precisely why the counters belong on the same board as the
+module rather than across a connector, and why the wiring discipline above is not optional.
 
 ### Product line-up
 
