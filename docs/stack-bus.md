@@ -143,9 +143,12 @@ goes on **J4**, the backend-counter SPI on **J2**, because the PoE adapter needs
 |---|---|---|---|
 | `BB_UART_TX` | 20 | 31 | frontend -> backend |
 | `BB_UART_RX` | 21 | 32 | backend -> frontend |
-| `BB_IRQ` | 22 | 33 | backend -> frontend, optional |
-| `BB_RESET` | 23 | 34 | frontend -> backend |
-| `BB_BOOT` | 1 | 18 | frontend -> backend, optional |
+| 5 V | -- | 1, 2 | 2 pins |
+| GND | -- | 3, 4 | 2 pins |
+
+**Six pins total** -- and that is the entire interconnection between the two boards. No IRQ, reset or boot
+line: each board has its own buttons, and the co-processor is idle apart from programming. J2 is not a
+connector at all -- the plate is soldered pad-to-pin to it.
 
 These five are the only J4 GPIOs that are both free and clear of the PoE reservation. If a sixth is
 ever needed, GPIO3-5 (J4 pins 20-22) are available at the cost of JTAG.
