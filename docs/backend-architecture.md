@@ -160,8 +160,8 @@ Consequences:
 - **A plate may bring bulk connectors instead of stacking under them.** The PoE-Ethernet adapter
   occupies the slot rather than having a board above it, so the LAN bridge is *PoE plate instead
   of backend plate*, not both.
-- **The same bus serves other products**: Zigbee coordinator and LAN bridge reuse the frontend
-  with no or different plates. See `docs/stack-bus.md` for the pin contract.
+- **The same bus serves other plates**: the LAN/PoE adapter reuses the frontend with no backend
+  plate at all. See `docs/stack-bus.md` for the pin contract.
 
 ## 8. Backend MCU module
 
@@ -213,10 +213,14 @@ module rather than across a connector, and why the wiring discipline above is no
 |---|---|---|
 | DRO / ELS | osptek P4C5 dev board | M5Stamp + 5x LS7366R + power |
 | Plain DRO | osptek P4C5 dev board | existing WROOM scale plate, 4-wire UART to J2 |
-| Zigbee coordinator / LAN bridge | osptek P4C5 dev board | none, or the PoE-Ethernet adapter |
+| LAN-connected DRO | osptek P4C5 dev board | none, or the PoE-Ethernet adapter |
 
-The Zigbee case needs no backend board: the C5 has IEEE 802.15.4 in hardware and esp_hosted
-ships an `openthread` example, so it is the same frontend plus firmware.
+The LAN case needs no backend board: the PoE-Ethernet adapter plugs onto J2 and gives the P4
+RMII, so it is the same frontend plus a plate.
+
+Zigbee and other 802.15.4 products are a separate project (`C:\SRC\zigbee-bridge`): they share
+this hardware and some components, but not this application. See `docs/stack-bus.md` section 5 for
+which GPIOs the PoE adapter reserves.
 
 ## 9. Power on the quadrature plate
 

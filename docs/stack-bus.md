@@ -122,7 +122,7 @@ use it, but a future radio plate will.
 | GPIO7, 8 | no -- touch/codec I2C |
 | GPIO9-13 | no -- audio I2S |
 | GPIO54 | no -- C5 chip enable |
-| **C5_IO4-IO6, C5_IO23-IO28** | **yes, and interesting** -- nine co-processor IOs, which is what a Zigbee/802.15.4 or radio plate would attach to |
+| **C5_IO4-IO6, C5_IO23-IO28** | **yes** -- nine co-processor IOs, available to a radio or bridge plate |
 
 ### The 3.3 V pins
 
