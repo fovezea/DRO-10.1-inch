@@ -48,8 +48,8 @@ Left column is odd pins, right column even, both descending:
 
 | Pin | Signal | Pin | Signal |
 |---|---|---|---|
-| 1 | GND | 2 | VIN_5V |
-| 3 | VIN_5V | 4 | GND |
+| 1 | VIN_5V | 2 | VIN_5V |
+| 3 | GND | 4 | GND |
 | 5 | GPIO52 | 6 | GPIO53 |
 | 7 | GPIO50 | 8 | GPIO51 |
 | 9 | GPIO48 | 10 | GPIO49 |
@@ -66,9 +66,11 @@ Left column is odd pins, right column even, both descending:
 | 31 | GPIO26 | 32 | GPIO27 |
 | 33 | GPIO24 | 34 | GPIO25 |
 
-Both headers follow the same pattern -- **1 = GND, 2 = 5 V, 3 = 5 V, 4 = GND** -- confirmed
-from the J4 drawing, which labels its left pair the same way. So four 5 V and four GND pins are
-available across the pair. At ~1.2 A total that is ~0.6 A per pin, well inside a
+Both headers use the same pattern: **pins 1-2 = 5 V, pins 3-4 = GND**. So four 5 V and four GND
+pins are available across the pair. This was verified against the schematic, not read off the
+vendor's drawing -- that drawing places the `GND` / `VIN_5V` labels above the connector with
+crossing wires, which reads as 1 = GND and 3 = 5 V, and is wrong. Read the net at the pin, never
+the nearest label. At ~1.2 A total that is ~0.6 A per pin, well inside a
 2.54 mm header pin's rating -- and using both headers' 5 V pins gives the four the power section
 assumed.
 
@@ -92,8 +94,8 @@ use it, but a future radio plate will.
 
 | Pin | Signal | Pin | Signal |
 |---|---|---|---|
-| 1 | GND | 2 | VIN_5V |
-| 3 | VIN_5V | 4 | GND |
+| 1 | VIN_5V | 2 | VIN_5V |
+| 3 | GND | 4 | GND |
 | 5 | +3V3 | 6 | +3V3 |
 | 7 | GPIO0 | 8 | GPIO54 |
 | 9 | C6_IO15 / C5_IO28 | 10 | C6_IO14 / C5_IO27 |
@@ -240,9 +242,9 @@ is 160-320 us of UART per frame -- feasible but not generous. A readout does not
 
 ## 7. What still needs verifying
 
-The mapping came from the vendor's own header drawings, so the plate footprint can be laid out
-against it. The power pins are settled (1 = GND, 2 = 5 V, 3 = 5 V, 4 = GND on both headers). Two
-small things remain, both checkable on the bench in minutes:
+The GPIO mapping came from the vendor's header drawings and was checked pin by pin; the power
+pins are settled by the schematic (1-2 = 5 V, 3-4 = GND on both headers). Two small things
+remain, both checkable on the bench in minutes:
 
 1. **GPIO46/47 (J2 pins 11, 12)**: not used by this frontend, but not confirmed free either. They
    are held in reserve rather than assigned.
