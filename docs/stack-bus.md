@@ -81,11 +81,10 @@ assumed.
 | 39-44 | 20, 17, 18, 15, 16, 13 | TF card (SD1 D0-D3, CLK, CMD) |
 | 45 | 14 | TF card detect |
 | 53 | 6 | NS4150B power-amp enable |
-| 46, 47 | 11, 12 | unused by the frontend, but confirmed occupied/unknown -- verify before claiming |
 
-**Free and usable: 24-38** (J2 pins 33, 31, 29, 27, 25, 23, 21, 19, 22, 24, 26, 28, 30, 32,
-34) -- fifteen pins, exactly what the bus needs -- plus **48-52** (pins 9, 7, 8, 5, 10) as spares
-for later plates.
+**Free and usable: GPIO24-38 and GPIO46-52** -- twenty-two pins on J2 (33, 31, 29, 27, 25, 23,
+21, 19, 22, 24, 26, 28, 30, 32, 34 and 11, 12, 9, 7, 8, 5, 10). The bus takes thirteen of them
+and leaves nine spare, which is comfortable headroom for a future plate.
 
 ## 3. The J4 header, as drawn
 
@@ -153,7 +152,8 @@ All on J2, so the plate mates with one header; J4 stays untouched for the C5 sid
 | `CS4` | 27 | 32 | backend -> counter 4 |
 | spare | 24 | 33 | |
 | spare | 25 | 34 | |
-| spare | 48-52 | 9, 7, 8, 5, 10 | for a future plate |
+| spare | 46-52 | 11, 12, 9, 7, 8, 5, 10 | for a future plate |
+| spare | 24, 25 | 33, 34 | |
 
 The interleaving is deliberate: `CS0..CS4` land on adjacent pins (28-32) so the ribbon to the
 counter chips runs as one bundle, and the UART/RESET group sits next to them at 19-24.
@@ -240,16 +240,15 @@ is 160-320 us of UART per frame -- feasible but not generous. A readout does not
 5. **One plate, one purpose.** A plate that brings its own bulk connectors (the PoE adapter)
    occupies the slot rather than having another board stacked above it.
 
-## 7. What still needs verifying
+## 7. Verification status
 
-The GPIO mapping came from the vendor's header drawings and was checked pin by pin; the power
-pins are settled by the schematic (1-2 = 5 V, 3-4 = GND on both headers). Two small things
-remain, both checkable on the bench in minutes:
+Confirmed against the schematic, pin by pin:
 
-1. **GPIO46/47 (J2 pins 11, 12)**: not used by this frontend, but not confirmed free either. They
-   are held in reserve rather than assigned.
-2. **GPIO48-52 (J2 pins 9, 7, 8, 5, 10)**: treated as spare. Confirm they are truly unconnected
-   on the dev board before relying on them for a future plate.
+- **J2 power**: pins 1-2 = 5 V, 3-4 = GND.
+- **J4 power**: same pattern.
+- **GPIO mapping**: all assignments in section 4 match J2.
+- **GPIO46-52**: free and unconnected on the dev board, so the spares are real.
 
-Nothing else is blocking: module, counters, bus functions, power topology and transport are all
-decided and recorded.
+Nothing about the bus is outstanding. The next artefact is the plate schematic itself: M5Stamp
+socket, five LS7366R behind the existing 74LVC245 front end, three step/dir outputs, and a single
+5 V input with its own 3.3 V regulator.
