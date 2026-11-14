@@ -49,7 +49,7 @@ Left column is odd pins, right column even, both descending:
 | Pin | Signal | Pin | Signal |
 |---|---|---|---|
 | 1 | GND | 2 | VIN_5V |
-| 3 | VIN_5V (verify) | 4 | GND |
+| 3 | VIN_5V | 4 | GND |
 | 5 | GPIO52 | 6 | GPIO53 |
 | 7 | GPIO50 | 8 | GPIO51 |
 | 9 | GPIO48 | 10 | GPIO49 |
@@ -66,7 +66,9 @@ Left column is odd pins, right column even, both descending:
 | 31 | GPIO26 | 32 | GPIO27 |
 | 33 | GPIO24 | 34 | GPIO25 |
 
-Two 5 V pins and two GND per header. At ~1.2 A total that is ~0.6 A per pin, well inside a
+Both headers follow the same pattern -- **1 = GND, 2 = 5 V, 3 = 5 V, 4 = GND** -- confirmed
+from the J4 drawing, which labels its left pair the same way. So four 5 V and four GND pins are
+available across the pair. At ~1.2 A total that is ~0.6 A per pin, well inside a
 2.54 mm header pin's rating -- and using both headers' 5 V pins gives the four the power section
 assumed.
 
@@ -83,7 +85,52 @@ assumed.
 34) -- fifteen pins, exactly what the bus needs -- plus **48-52** (pins 9, 7, 8, 5, 10) as spares
 for later plates.
 
-## 3. Proposed allocation
+## 3. The J4 header, as drawn
+
+J4 covers the low GPIOs, GPIO54, the nine co-processor IOs and a 3.3 V rail. The bus does not
+use it, but a future radio plate will.
+
+| Pin | Signal | Pin | Signal |
+|---|---|---|---|
+| 1 | GND | 2 | VIN_5V |
+| 3 | VIN_5V | 4 | GND |
+| 5 | +3V3 | 6 | +3V3 |
+| 7 | GPIO0 | 8 | GPIO54 |
+| 9 | C6_IO15 / C5_IO28 | 10 | C6_IO14 / C5_IO27 |
+| 11 | C6_IO13 / C5_IO26 | 12 | C6_IO9 / C5_IO25 |
+| 13 | C6_IO8 / C5_IO24 | 14 | C6_IO7 / C5_IO23 |
+| 15 | C6_IO6 / C5_IO6 | 16 | C6_IO5 / C5_IO5 |
+| 17 | C6_IO4 / C5_IO4 | 18 | GPIO1 |
+| 19 | GPIO2 | 20 | GPIO3 |
+| 21 | GPIO4 | 22 | GPIO5 |
+| 23 | GPIO6 | 24 | GPIO7 |
+| 25 | GPIO8 | 26 | GPIO9 |
+| 27 | GPIO10 | 28 | GPIO11 |
+| 29 | GPIO12 | 30 | GPIO13 |
+| 31 | GPIO20 | 32 | GPIO21 |
+| 33 | GPIO22 | 34 | GPIO23 |
+
+### What a plate may use here
+
+| Group | Usable? |
+|---|---|
+| GPIO1, 20-23 | yes -- free on this frontend |
+| GPIO2-5 | yes, but they are the JTAG pads (MTCK/MTDI/MTMS/MTDO) |
+| GPIO0 | no -- boot strapping |
+| GPIO6 | no -- C5 handshake |
+| GPIO7, 8 | no -- touch/codec I2C |
+| GPIO9-13 | no -- audio I2S |
+| GPIO54 | no -- C5 chip enable |
+| **C5_IO4-IO6, C5_IO23-IO28** | **yes, and interesting** -- nine co-processor IOs, which is what a Zigbee/802.15.4 or radio plate would attach to |
+
+### The 3.3 V pins
+
+J4 brings out +3V3 on pins 5 and 6. Small loads -- the five LS7366Rs draw ~10 mA -- could run from
+it, but the **backend P4 module must not**: it wants a few hundred milliamps at 3.3 V, which the
+frontend's own regulator is not there to supply. The plate should generate its own 3.3 V from the
+5 V rail and treat J4's 3V3 as optional, not as the supply.
+
+## 4. Proposed allocation
 
 All on J2, so the plate mates with one header; J4 stays untouched for the C5 side.
 
@@ -143,7 +190,7 @@ only matter at the tens-of-MHz rates the counters never need. It does mean the p
 free rather than dictated by the IO MUX, which is why the allocation above is a proposal rather
 than a constraint.
 
-## 4. Frontend-backend transport
+## 5. Frontend-backend transport
 
 **Proposed: UART.** Not forced by the silicon -- SPI would work -- but it is the better fit for
 what this link carries, and the choice is worth stating explicitly rather than assuming.
@@ -176,7 +223,7 @@ Bandwidth check for the plain-DRO plate: 32-byte frames at 1 kHz over the CH340C
 is 160-320 us of UART per frame -- feasible but not generous. A readout does not need 1 kHz;
 200 Hz is plenty and leaves large margin.
 
-## 5. Rules a plate must follow
+## 6. Rules a plate must follow
 
 1. **Reserve, don't discover.** If a plate needs a pin outside the table above, add it here
    first. Two plates inventing the same pin two years apart is the failure mode this document
@@ -191,17 +238,15 @@ is 160-320 us of UART per frame -- feasible but not generous. A readout does not
 5. **One plate, one purpose.** A plate that brings its own bulk connectors (the PoE adapter)
    occupies the slot rather than having another board stacked above it.
 
-## 6. What still needs verifying
+## 7. What still needs verifying
 
-The J2 mapping above came from the vendor's own header drawing, so the plate footprint can be
-laid out against it. Three small things remain, all checkable on the bench in minutes:
+The mapping came from the vendor's own header drawings, so the plate footprint can be laid out
+against it. The power pins are settled (1 = GND, 2 = 5 V, 3 = 5 V, 4 = GND on both headers). Two
+small things remain, both checkable on the bench in minutes:
 
-1. **Pins 1-4 on J2**: the drawing shows two 5 V and two GND, but the left pair (1, 3) is not
-   labelled unambiguously -- confirm which is which with a meter before committing the footprint's
-   power pins. Getting this backwards is a short, not a nuisance.
-2. **GPIO46/47 (J2 pins 11, 12)**: not used by this frontend, but not confirmed free either. They
+1. **GPIO46/47 (J2 pins 11, 12)**: not used by this frontend, but not confirmed free either. They
    are held in reserve rather than assigned.
-3. **GPIO48-52 (J2 pins 9, 7, 8, 5, 10)**: treated as spare. Confirm they are truly unconnected
+2. **GPIO48-52 (J2 pins 9, 7, 8, 5, 10)**: treated as spare. Confirm they are truly unconnected
    on the dev board before relying on them for a future plate.
 
 Nothing else is blocking: module, counters, bus functions, power topology and transport are all
